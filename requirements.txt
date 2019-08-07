@@ -3,3 +3,4 @@ flask-sqlalchemy
 psycopg2
 python-dotenv
 twilio
+Werkzeug
