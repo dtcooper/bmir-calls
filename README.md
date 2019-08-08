@@ -1,30 +1,36 @@
 # BMIR Call Routing Software
 
 Here's the [Flask](https://palletsprojects.com/p/flask/) app that routes calls
-to and from Burning Man Information Radio (BMIR), for both the broadcast desk
-(the "broadcast phone") and the in-lounge hotline (the "weirdness phone") via
+to and from [Burning Man Information Radio (BMIR)](https://bmir.org), for both
+the broadcast desk (the "broadcast phone") and our new for 2019, in-lounge
+hotline (the "weirdness phone") via
 [Twilio](https://www.twilio.com/).
 
 Here's a [link to the Google form](https://calls.bmir.org/) where you can enroll.
 
-## Development
+## Running via docker-compose
 
-You'll need Docker and docker-compose installed.
+Getting the project up and running is pretty easy. You'll need
+[Docker](https://www.docker.com/) and
+[docker-compose](https://docs.docker.com/compose/) installed.
 ([Docker for Mac](https://docs.docker.com/docker-for-mac/install/) bundles
 both.) Then,
 
 ```bash
-# Build the containers
-docker-compose build
+# Clone the repo
+git clone https://github.com/dtcooper/bmir-calls.git
+cd bmir-calls
 
-# Initialize the database
+# Build the containers, initialize the database
+docker-compose build
 docker-compose run app flask init-db
 
 # Run the unit tests
 docker-compose run app pytest
 ```
 
-Now to run the application which should be available at http://127.0.0.1:5000/
+Run the application which'll then be available at
+[127.0.0.1:5000](http://127.0.0.1:5000/).
 
 ```bash
 # Brings up the server (will auto-reload for development)
