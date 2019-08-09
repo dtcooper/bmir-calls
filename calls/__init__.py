@@ -1,10 +1,13 @@
 import os
 
-import click
 from twilio.rest import Client as TwilioClient
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from flask import Flask
+from flask import (
+    Flask,
+    request,
+    Response,
+)
 
 from .models import db
 from .volunteers import volunteers
@@ -21,6 +24,7 @@ if os.path.exists(site_config_path):
 
 # Register extensions
 db.init_app(app)
+
 
 # Set up Twilio client globally on app
 app.twilio = TwilioClient(
@@ -45,6 +49,13 @@ def init_db():
         db.drop_all()
         db.create_all()
         db.session.commit()
+
+
+@app.before_request
+def protected():
+    password = request.args.get('password', '')
+    if not (password == app.config['API_PASSWORD'] or app.config['DEBUG']):
+        return Response(status=403)
 
 
 @app.route('/')

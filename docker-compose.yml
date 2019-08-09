@@ -2,7 +2,9 @@ version: '3'
 services:
   app:
     image: calls-app
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app
     volumes:
       - .:/app
     ports:
@@ -10,7 +12,10 @@ services:
     depends_on:
       - db
   db:
-    image: postgres:10.9
+    image: calls-db
+    build:
+      context: docker
+      dockerfile: Dockerfile.db
     ports:
       - 5432:5432
     volumes:

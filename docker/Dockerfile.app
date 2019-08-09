@@ -11,8 +11,11 @@ ENV PYTHONUNBUFFERED 1
 RUN mkdir /app
 WORKDIR /app
 
-COPY requirements.txt requirements_dev.txt /app/
-RUN pip install -r requirements.txt -r requirements_dev.txt
+COPY requirements_dev.txt /app/
+RUN pip install -r requirements_dev.txt
+
+COPY requirements.txt /app/
+RUN pip install -r requirements.txt
 
 COPY . /app
 CMD flask run -h 0.0.0.0

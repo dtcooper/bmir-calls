@@ -1,0 +1,6 @@
+FROM postgres:10.9
+
+ENV POSTGRES_USER postgres
+ENV POSTGRES_MULTIPLE_DATABASES "postgres,testing"
+
+COPY create_test_db.sh /docker-entrypoint-initdb.d/

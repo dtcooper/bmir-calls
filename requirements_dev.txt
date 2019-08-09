@@ -1,3 +1,6 @@
+flake8
 flask-shell-ipython
 ipdb
 ipython
+pytest
+pytest-flake8
