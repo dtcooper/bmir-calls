@@ -50,7 +50,7 @@ class VolunteerBase:
 class Submission(VolunteerBase, db.Model):
     __tablename__ = 'submissions'
     enabled = db.Column(db.Boolean, nullable=False, default=True)
-    timezone = db.Column(db.String(255), nullable=False)
+    timezone = db.Column(db.String(255), nullable=False, default='')
     valid_phone = db.Column(db.Boolean, nullable=False, default=True)
 
     def create_or_update_volunteer(self):

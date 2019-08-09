@@ -10,8 +10,9 @@ from .models import (
     Volunteer,
 )
 from .utils import (
-    render_xml,
+    protected,
     protected_url_for,
+    render_xml,
 )
 
 
@@ -19,6 +20,7 @@ volunteers = Blueprint('volunteers', __name__, url_prefix='/volunteers')
 
 
 @volunteers.route('/submit', methods=('POST',))
+@protected
 def submit():
     submission = Submission.create_from_json(request.get_json())
 
@@ -34,12 +36,14 @@ def submit():
 
 
 @volunteers.route('/submit/verify/<int:id>', methods=('POST',))
+@protected
 def verify(id):
     submission = Submission.query.filter_by(id=id).first_or_404()
     return render_xml('volunteers/verify.xml', submission=submission)
 
 
 @volunteers.route('/')
+@protected
 def json():
     return {
         'submissions': [s.serialize() for s in Submission.query.order_by(

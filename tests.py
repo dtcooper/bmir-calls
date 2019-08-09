@@ -114,6 +114,62 @@ class CallsTests(unittest.TestCase):
             url=protected_url_for('volunteers.verify', id=submission.id),
         )
 
+    @unittest.skip("Implement don't call on no time slots")
+    def test_form_submit_empty_vals(self):
+        self.assertEqual(Submission.query.count(), 0)
+        self.assertEqual(Volunteer.query.count(), 0)
+
+        data = self.get_submit_json(
+            opt_in_hours=None,
+            timezone=None,
+            comments=None,
+        )
+        response = self.client.post(protected_url_for('volunteers.submit'), json=data)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(Submission.query.count(), 1)
+        self.assertEqual(Volunteer.query.count(), 0)
+
+        submission = Submission.query.first()
+
+        self.assertEqual(submission.name, 'Test User')
+        self.assertEqual(submission.email, 'test-user@example.com')
+        self.assertEqual(submission.phone_number, '+14169671111')
+        self.assertEqual(submission.opt_in_hours, [])
+        self.assertEqual(submission.comments, '')
+        self.assertEqual(submission.timezone, '')
+        self.assertTrue(submission.enabled)
+
+        # We had no time slots, so this is the same as disabled. Don't call.
+        self.twilio_mock.calls.create.assert_not_called()
+
+        data = self.get_submit_json(
+            opt_in_hours=['noon' - '2pm'],
+            timezone=None,
+            comments=None,
+        )
+        response = self.client.post(protected_url_for('volunteers.submit'), json=data)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(Submission.query.count(), 2)
+        self.assertEqual(Volunteer.query.count(), 0)
+
+        submission = Submission.query.order_by(Submission.id.desc()).first()
+
+        self.assertEqual(submission.name, 'Test User')
+        self.assertEqual(submission.email, 'test-user@example.com')
+        self.assertEqual(submission.phone_number, '+14169671111')
+        self.assertEqual(submission.opt_in_hours, [12, 13])
+        self.assertEqual(submission.comments, '')
+        self.assertEqual(submission.timezone, '')
+        self.assertTrue(submission.enabled)
+
+        self.twilio_mock.calls.create.assert_called_once_with(
+            from_=app.config['WEIRDNESS_NUMBER'],
+            to='+14169671111',
+            url=protected_url_for('volunteers.verify', id=submission.id),
+        )
+
     def test_create_or_update_volunteer(self):
         self.assertEqual(Submission.query.count(), 0)
         self.assertEqual(Volunteer.query.count(), 0)

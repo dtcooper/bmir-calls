@@ -1,9 +1,23 @@
+from functools import wraps
+
 from flask import (
     current_app as app,
     render_template,
+    request,
     Response,
     url_for,
 )
+
+
+def protected(route):
+    @wraps(route)
+    def protected_route(*args, **kwargs):
+        password = request.args.get('password', '')
+        if password == app.config['API_PASSWORD'] or app.config['DEBUG']:
+            return route(*args, **kwargs)
+        else:
+            return Response(status=403)
+    return protected_route
 
 
 def render_xml(template, *args, **kwargs):

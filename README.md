@@ -19,6 +19,9 @@ docker-compose build
 
 # Initialize the database
 docker-compose run app flask init-db
+
+# Run the unit tests
+docker-compose run app pytest
 ```
 
 Now to run the application which should be available at http://127.0.0.1:5000/
@@ -27,11 +30,9 @@ Now to run the application which should be available at http://127.0.0.1:5000/
 # Brings up the server (will auto-reload for development)
 docker-compose up
 
-# Runs unit tests
-docker-compose run app pytest
-
-# Enter the container to run the server manually (must listen on 0.0.0.0)
-docker-compose run app bash
+# Or enter the container to run the server manually (must listen on 0.0.0.0)
+# Useful for development, using a debugger, using the Python shell, etc
+docker-compose run --service-ports app bash
 flask run -h 0.0.0.0
 ```
 

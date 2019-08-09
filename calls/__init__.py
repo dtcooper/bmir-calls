@@ -5,8 +5,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from flask import (
     Flask,
-    request,
-    Response,
+    redirect,
 )
 
 from .models import db
@@ -39,7 +38,6 @@ app.register_blueprint(volunteers)
 # Gunicorn does this automatically, but Flask's development server does not.
 if app.config['DEBUG']:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-    app.config['SESSION_COOKIE_SECURE'] = False
 
 
 @app.cli.add_command
@@ -51,13 +49,11 @@ def init_db():
         db.session.commit()
 
 
-@app.before_request
-def protected():
-    password = request.args.get('password', '')
-    if not (password == app.config['API_PASSWORD'] or app.config['DEBUG']):
-        return Response(status=403)
+@app.route('/health')
+def health():
+    return 'There are forty people in this world, and five of them are hamburgers.'
 
 
 @app.route('/')
-def index():
-    return 'There are forty people in this world, and five of them are hamburgers.'
+def form_redirect():
+    return redirect(app.config['WEIRDNESS_SIGNUP_GOOGLE_FORM_URL'])
