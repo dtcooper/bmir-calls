@@ -2,8 +2,10 @@ import re
 from unittest.mock import patch
 import unittest
 
-from sqlalchemy.engine.url import make_url
 import pytz
+from sqlalchemy.engine.url import make_url
+
+from flask import url_for
 
 from calls import app
 from calls.models import (
@@ -11,7 +13,6 @@ from calls.models import (
     Submission,
     Volunteer,
 )
-from calls.utils import protected_url_for
 
 
 class CallsTests(unittest.TestCase):
@@ -27,7 +28,7 @@ class CallsTests(unittest.TestCase):
             'DEBUG': False,
             'SERVER_NAME': 'example.com',
             'SQLALCHEMY_DATABASE_URI': str(testing_db_uri),
-            'API_PASSWORD': 'test-password',
+            'API_PASSWORD': '',
             'SERVER_TZ': pytz.timezone('US/Pacific'),
         })
 
@@ -42,7 +43,7 @@ class CallsTests(unittest.TestCase):
         self.context.pop()
         self.twilio_patch.stop()
 
-    def get_submit_json(self, bad_phone_number=False, **kwargs):
+    def get_submit_json(self, **kwargs):
         json_data = {
             'email': 'test-user@example.com',
             'enabled': True,
@@ -58,10 +59,7 @@ class CallsTests(unittest.TestCase):
         }
         json_data.update(kwargs)
 
-        if bad_phone_number:
-            mock_phone = False
-        else:
-            mock_phone = '+1{}'.format(re.sub(r'[^0-9]', '', json_data['phone_number']))
+        mock_phone = '+1{}'.format(re.sub(r'[^0-9]', '', json_data['phone_number']))
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = mock_phone
 
         return json_data
@@ -89,7 +87,7 @@ class CallsTests(unittest.TestCase):
         self.assertEqual(Volunteer.query.count(), 0)
 
         response = self.client.post(
-            protected_url_for('volunteers.submit'), json=self.get_submit_json())
+            url_for('volunteers.submit'), json=self.get_submit_json())
         self.assertEqual(response.status_code, 200)
 
         self.assertEqual(Submission.query.count(), 1)
@@ -107,31 +105,17 @@ class CallsTests(unittest.TestCase):
             '[GMT-07:00] Pacific Time // Black Rock City Time (US/Pacific)',
         )
         self.assertTrue(submission.valid_phone)
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
 
-        self.twilio_mock.calls.create.assert_called_once_with(
-            from_=app.config['WEIRDNESS_NUMBER'],
-            to='+14169671111',
-            url=protected_url_for('volunteers.verify', id=submission.id),
-        )
-
-    @unittest.skip("Implement don't call on no time slots")
-    def test_form_submit_empty_vals(self):
-        self.assertEqual(Submission.query.count(), 0)
-        self.assertEqual(Volunteer.query.count(), 0)
-
-        data = self.get_submit_json(
-            opt_in_hours=None,
-            timezone=None,
-            comments=None,
-        )
-        response = self.client.post(protected_url_for('volunteers.submit'), json=data)
+    def test_form_submit_corner_cases(self):
+        # Try 1: Empty values
+        data = self.get_submit_json(opt_in_hours=None, timezone=None, comments=None)
+        response = self.client.post(url_for('volunteers.submit'), json=data)
         self.assertEqual(response.status_code, 200)
 
         self.assertEqual(Submission.query.count(), 1)
         self.assertEqual(Volunteer.query.count(), 0)
-
         submission = Submission.query.first()
-
         self.assertEqual(submission.name, 'Test User')
         self.assertEqual(submission.email, 'test-user@example.com')
         self.assertEqual(submission.phone_number, '+14169671111')
@@ -139,37 +123,36 @@ class CallsTests(unittest.TestCase):
         self.assertEqual(submission.comments, '')
         self.assertEqual(submission.timezone, '')
         self.assertTrue(submission.enabled)
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 1)
 
-        # We had no time slots, so this is the same as disabled. Don't call.
-        self.twilio_mock.calls.create.assert_not_called()
-
-        data = self.get_submit_json(
-            opt_in_hours=['noon' - '2pm'],
-            timezone=None,
-            comments=None,
-        )
-        response = self.client.post(protected_url_for('volunteers.submit'), json=data)
+        # Try 2: We have time slots, but now we're disabled
+        data = self.get_submit_json(opt_in_hours=['noon - 2pm'], enabled=False)
+        response = self.client.post(url_for('volunteers.submit'), json=data)
         self.assertEqual(response.status_code, 200)
-
         self.assertEqual(Submission.query.count(), 2)
         self.assertEqual(Volunteer.query.count(), 0)
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 2)
 
+        # Now an invalid phone number
+        data = self.get_submit_json(phone_number='hi mom!')
+        with patch('calls.models.sanitize_phone_number', lambda _: False):
+            response = self.client.post(url_for('volunteers.submit'), json=data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Submission.query.count(), 3)
+        self.assertEqual(Volunteer.query.count(), 0)
         submission = Submission.query.order_by(Submission.id.desc()).first()
+        self.assertFalse(submission.valid_phone)
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 2)
 
-        self.assertEqual(submission.name, 'Test User')
-        self.assertEqual(submission.email, 'test-user@example.com')
-        self.assertEqual(submission.phone_number, '+14169671111')
-        self.assertEqual(submission.opt_in_hours, [12, 13])
-        self.assertEqual(submission.comments, '')
-        self.assertEqual(submission.timezone, '')
-        self.assertTrue(submission.enabled)
+        # Now let's create a volunteer with the same phone number
+        self.create_submission(phone_number=submission.phone_number).create_volunteer()
+        self.assertEqual(Submission.query.count(), 4)
+        self.assertEqual(Volunteer.query.count(), 1)
 
-        self.twilio_mock.calls.create.assert_called_once_with(
-            from_=app.config['WEIRDNESS_NUMBER'],
-            to='+14169671111',
-            url=protected_url_for('volunteers.verify', id=submission.id),
-        )
-
+    @unittest.skip('create_or_update_volunteer no longer exists')
     def test_create_or_update_volunteer(self):
         self.assertEqual(Submission.query.count(), 0)
         self.assertEqual(Volunteer.query.count(), 0)
@@ -229,10 +212,10 @@ class CallsTests(unittest.TestCase):
             self.create_submission(phone_number='+1416967111{}'.format(n))
             for n in range(5)
         ]
-        volunteers = [s.create_or_update_volunteer() for s in submissions]
+        volunteers = [s.create_volunteer() for s in submissions]
         data = {'submissions': submissions, 'volunteers': volunteers}
 
-        response = self.client.get(protected_url_for('volunteers.json'))
+        response = self.client.get(url_for('volunteers.json'))
         self.assertEqual(response.status_code, 200)
 
         for key, items in data.items():
@@ -242,3 +225,11 @@ class CallsTests(unittest.TestCase):
                 [item.id for item in items],
                 [item['id'] for item in response.json[key]])
         self.assertEqual(response.json['timezone'], 'US/Pacific')
+
+    def test_root_urls(self):
+        response = self.client.get(url_for('health'))
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.get(url_for('form_redirect'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, app.config['WEIRDNESS_SIGNUP_GOOGLE_FORM_URL'])

@@ -1,5 +1,7 @@
 from functools import wraps
 
+from twilio.base.exceptions import TwilioRestException
+
 from flask import (
     current_app as app,
     render_template,
@@ -7,6 +9,14 @@ from flask import (
     Response,
     url_for,
 )
+
+
+def sanitize_phone_number(phone_number):
+    try:
+        return app.twilio.lookups.phone_numbers(
+            phone_number).fetch(country_code='US').phone_number
+    except TwilioRestException:
+        return False
 
 
 def protected(route):
@@ -24,7 +34,7 @@ def render_xml(template, *args, **kwargs):
     return Response(render_template(template, *args, **kwargs), content_type='text/xml')
 
 
-def protected_url_for(endpoint, *args, **kwargs):
+def protected_external_url(endpoint, *args, **kwargs):
     defaults = {'_external': True, 'password': app.config['API_PASSWORD']}
     defaults.update(kwargs)
     return url_for(endpoint, *args, **defaults)

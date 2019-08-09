@@ -3,4 +3,5 @@ flask-shell-ipython
 ipdb
 ipython
 pytest
+pytest-cov
 pytest-flake8

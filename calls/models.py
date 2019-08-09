@@ -1,10 +1,10 @@
 import datetime
 import pytz
 
-from twilio.base.exceptions import TwilioRestException
-
 from flask import current_app as app
 from flask_sqlalchemy import SQLAlchemy
+
+from .utils import sanitize_phone_number
 
 
 db = SQLAlchemy()
@@ -53,37 +53,15 @@ class Submission(VolunteerBase, db.Model):
     timezone = db.Column(db.String(255), nullable=False, default='')
     valid_phone = db.Column(db.Boolean, nullable=False, default=True)
 
-    def create_or_update_volunteer(self):
-        assert self.valid_phone, "Won't create without a valid phone number"
+    def get_volunteer_kwargs(self):
+        kwargs = {
+            name: getattr(self, name)
+            for name, column in VolunteerBase.__dict__.items()
+            if isinstance(column, db.Column)
+        }
+        kwargs['submission_id'] = kwargs.pop('id')
 
-        volunteer = Volunteer.query.filter_by(
-            phone_number=self.phone_number).first()
-
-        if self.enabled:
-            kwargs = {
-                name: getattr(self, name)
-                for name, column in VolunteerBase.__dict__.items()
-                if isinstance(column, db.Column)
-            }
-            kwargs['submission_id'] = kwargs.pop('id')
-
-            if volunteer:
-                for name, value in kwargs.items():
-                    setattr(volunteer, name, value)
-            else:
-                volunteer = Volunteer(**kwargs)
-
-            db.session.add(volunteer)
-            db.session.commit()
-
-        elif volunteer is not None:
-            # Disabled with existing volunteer
-            db.session.delete(volunteer)
-            db.session.commit()
-
-            volunteer = None
-
-        return volunteer
+        return kwargs
 
     @classmethod
     def create_from_json(cls, json_data):
@@ -125,20 +103,36 @@ class Submission(VolunteerBase, db.Model):
             # Form is in two hour chunks
             opt_in_hours.extend([hour, (hour + 1) % 24])
 
-        kwargs['opt_in_hours'] = sorted(opt_in_hours)
+        kwargs.update({
+            'opt_in_hours': sorted(opt_in_hours),
+            'valid_phone': False,
+        })
 
-        try:
-            kwargs['phone_number'] = app.twilio.lookups.phone_numbers(
-                kwargs['phone_number']).fetch(country_code='US').phone_number
-            kwargs['valid_phone'] = True
-        except TwilioRestException:
-            kwargs['valid_phone'] = False
+        phone_number = sanitize_phone_number(kwargs['phone_number'])
+        if phone_number:
+            kwargs.update({
+                'phone_number': phone_number,
+                'valid_phone': True,
+            })
 
         submission = cls(**kwargs)
         db.session.add(submission)
         db.session.commit()
 
         return submission
+
+    def create_volunteer(self):
+        if all([
+            # Make sure we're enabled and have a valid phone, with no existing volunteer
+            self.enabled, self.opt_in_hours, self.valid_phone,
+            not bool(Volunteer.query.filter_by(phone_number=self.phone_number).first()),
+        ]):
+            volunteer = Volunteer(**self.get_volunteer_kwargs())
+            db.session.add(volunteer)
+            db.session.commit()
+            return volunteer
+        else:
+            return False
 
 
 class Volunteer(VolunteerBase, db.Model):

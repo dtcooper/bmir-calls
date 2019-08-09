@@ -17,4 +17,5 @@ SERVER_TZ = pytz.timezone('US/Pacific')
 DATE_FOR_TZ_CONVERSION = datetime.date(2019, 8, 25)
 
 WEIRDNESS_SIGNUP_GOOGLE_FORM_URL = 'http://example.com/'
+WEIRDNESS_SIGNUP_SONG = 'http://example.com/singup-song.mp3'
 WEIRDNESS_NUMBER = '+15555551234'
