@@ -107,10 +107,11 @@ class CallsTests(unittest.TestCase):
         self.assertTrue(submission.valid_phone)
         self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
 
-    def test_form_submit_corner_cases(self):
+    def test_form_submit_additional_cases(self):
         # Try 1: Empty values
-        data = self.get_submit_json(opt_in_hours=None, timezone=None, comments=None)
-        response = self.client.post(url_for('volunteers.submit'), json=data)
+        response = self.client.post(
+            url_for('volunteers.submit'),
+            json=self.get_submit_json(opt_in_hours=None, timezone=None, comments=None))
         self.assertEqual(response.status_code, 200)
 
         self.assertEqual(Submission.query.count(), 1)
@@ -127,18 +128,20 @@ class CallsTests(unittest.TestCase):
         self.assertEqual(self.twilio_mock.messages.create.call_count, 1)
 
         # Try 2: We have time slots, but now we're disabled
-        data = self.get_submit_json(opt_in_hours=['noon - 2pm'], enabled=False)
-        response = self.client.post(url_for('volunteers.submit'), json=data)
+        response = self.client.post(
+            url_for('volunteers.submit'),
+            json=self.get_submit_json(opt_in_hours=['noon - 2pm'], enabled=False))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Submission.query.count(), 2)
         self.assertEqual(Volunteer.query.count(), 0)
         self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
         self.assertEqual(self.twilio_mock.messages.create.call_count, 2)
 
-        # Now an invalid phone number
-        data = self.get_submit_json(phone_number='hi mom!')
+        # Try 3: Invalid phone number, nothing happens
         with patch('calls.models.sanitize_phone_number', lambda _: False):
-            response = self.client.post(url_for('volunteers.submit'), json=data)
+            response = self.client.post(
+                url_for('volunteers.submit'),
+                json=self.get_submit_json(phone_number='hi mom!'))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Submission.query.count(), 3)
         self.assertEqual(Volunteer.query.count(), 0)
@@ -148,64 +151,43 @@ class CallsTests(unittest.TestCase):
         self.assertEqual(self.twilio_mock.messages.create.call_count, 2)
 
         # Now let's create a volunteer with the same phone number
-        self.create_submission(phone_number=submission.phone_number).create_volunteer()
+        submission = self.create_submission()
+        volunteer = submission.create_volunteer()
+        self.assertNotEqual(volunteer.name, 'Updated User')
         self.assertEqual(Submission.query.count(), 4)
         self.assertEqual(Volunteer.query.count(), 1)
 
-    @unittest.skip('create_or_update_volunteer no longer exists')
-    def test_create_or_update_volunteer(self):
-        self.assertEqual(Submission.query.count(), 0)
-        self.assertEqual(Volunteer.query.count(), 0)
-
-        # Create
-        submission1 = self.create_submission()
-        volunteer = submission1.create_or_update_volunteer()
-
-        self.assertEqual(Submission.query.count(), 1)
+        # Try 4: Volunteer exists
+        response = self.client.post(
+            url_for('volunteers.submit'),
+            json=self.get_submit_json(name='Updated User', timezone='invalid'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Submission.query.count(), 5)
         self.assertEqual(Volunteer.query.count(), 1)
+        volunteer = Volunteer.query.first()
+        self.assertEqual(volunteer.name, 'Updated User')
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 3)
 
-        self.assertEqual(submission1.name, volunteer.name)
-        self.assertEqual(submission1.email, volunteer.email)
-        self.assertEqual(submission1.phone_number, volunteer.phone_number)
-        self.assertEqual(submission1.opt_in_hours, volunteer.opt_in_hours)
-        self.assertEqual(submission1.comments, volunteer.comments)
-        self.assertEqual(submission1.id, volunteer.submission_id)
-        previous_id = volunteer.id
+        # Try 5: Disable
+        response = self.client.post(
+            url_for('volunteers.submit'), json=self.get_submit_json(enabled=False))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Submission.query.count(), 6)
+        self.assertEqual(Volunteer.query.count(), 0)
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 4)
 
-        # Update
-        submission2 = self.create_submission(
-            name='Updated User',
-            email='updated@example.com',
-            opt_in_hours=list(range(12, 18)),
-            comments='updated',
+    def test_column_max_size(self):
+        submission = self.create_submission(
+            name='a' * 500,
+            phone_number='1' * 500,
+            email='a@{}.com'.format('b' * 500),
         )
-        volunteer = submission2.create_or_update_volunteer()
 
-        self.assertEqual(Submission.query.count(), 2)
-        self.assertEqual(Volunteer.query.count(), 1)
-
-        self.assertEqual(previous_id, volunteer.id)
-        self.assertEqual(submission2.name, volunteer.name)
-        self.assertEqual(submission2.email, volunteer.email)
-        self.assertEqual(submission2.phone_number, volunteer.phone_number)
-        self.assertEqual(submission2.opt_in_hours, volunteer.opt_in_hours)
-        self.assertEqual(submission2.comments, volunteer.comments)
-        self.assertEqual(submission2.id, volunteer.submission_id)
-
-        # Delete
-        submission3 = self.create_submission(enabled=False)
-        volunteer = submission3.create_or_update_volunteer()
-
-        self.assertIsNone(volunteer)
-        self.assertEqual(Submission.query.count(), 3)
-        self.assertEqual(Volunteer.query.count(), 0)
-
-        # Delete again, should do nothing
-        submission4 = self.create_submission(enabled=False)
-        volunteer = submission4.create_or_update_volunteer()
-
-        self.assertEqual(Submission.query.count(), 4)
-        self.assertEqual(Volunteer.query.count(), 0)
+        self.assertEqual(len(submission.name), 255)
+        self.assertEqual(len(submission.email), 255)
+        self.assertEqual(len(submission.phone_number), 20)
 
     def test_json_view(self):
         submissions = [
@@ -226,7 +208,7 @@ class CallsTests(unittest.TestCase):
                 [item['id'] for item in response.json[key]])
         self.assertEqual(response.json['timezone'], 'US/Pacific')
 
-    def test_root_urls(self):
+    def test_public_urls(self):
         response = self.client.get(url_for('health'))
         self.assertEqual(response.status_code, 200)
 

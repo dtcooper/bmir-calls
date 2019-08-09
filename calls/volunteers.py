@@ -36,7 +36,7 @@ def process_submit(submission):
     if volunteer:
         if submission.enabled and submission.opt_in_hours:
             text_msg = 'Thanks for updating your submission.'
-            for attr, value in submission.get_volunteer_kwargs():
+            for attr, value in submission.get_volunteer_kwargs().items():
                 setattr(volunteer, attr, value)
             db.session.add(volunteer)
         else:

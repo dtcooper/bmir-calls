@@ -42,7 +42,7 @@ if app.config['DEBUG']:
 
 @app.cli.add_command
 @app.cli.command('init-db', help='Initialize the DB.')
-def init_db():  # pragma: no cover
+def init_db():
     with app.app_context():
         db.drop_all()
         db.create_all()
