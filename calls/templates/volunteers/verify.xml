@@ -7,13 +7,11 @@
       <Play>{{ song_url }}</Play>
       <Hangup />
     {% else %}
-      {% if first_run %}
-        <Say voice="alice">
-          Welcome to the B. M. I. R. F. M. phone experiment, {{ name }}.
-        </Say>
-      {% endif %}
       <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
         <Say voice="alice">
+        {% if first_run %}
+          Welcome to the B. M. I. R. F. M. phone experiment, {{ name }}.
+        {% endif %}
           If you would like to participate
           {%- if not first_run %}
             in the B. M. I. R. phone experiment
