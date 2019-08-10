@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    {% if message %}
+        <Say>{{ message }}</Say>
+        <Hangup />
+    {% else %}
+        <Reject />
+    {% endif %}
+</Response>
