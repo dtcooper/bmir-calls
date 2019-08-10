@@ -15,7 +15,7 @@ def sanitize_phone_number(phone_number):
     try:
         return app.twilio.lookups.phone_numbers(
             phone_number).fetch(country_code='US').phone_number
-    except TwilioRestException:
+    except TwilioRestException:  # skip coverage
         return False
 
 

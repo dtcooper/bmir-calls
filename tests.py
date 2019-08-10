@@ -189,6 +189,38 @@ class CallsTests(unittest.TestCase):
         self.assertEqual(len(submission.email), 255)
         self.assertEqual(len(submission.phone_number), 20)
 
+    def test_verify(self):
+        submission = self.create_submission()
+        self.assertEqual(Volunteer.query.count(), 0)
+
+        # Try #1: Initial TwiML
+        response = self.client.post(url_for('volunteers.verify', id=submission.id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Volunteer.query.count(), 0)
+
+        # Try #2: User pressed '1', Create new volunteer (and test invalid gather arg)
+        response = self.client.post(
+            url_for('volunteers.verify', id=submission.id, gather='q'),
+            data={'Digits': '1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Volunteer.query.count(), 1)
+
+        volunteer = Volunteer.query.first()
+        self.assertEqual(submission.id, volunteer.submission_id)
+        self.assertEqual(submission.name, volunteer.name)
+        self.assertEqual(submission.email, volunteer.email)
+        self.assertEqual(submission.phone_number, volunteer.phone_number)
+        self.assertEqual(submission.opt_in_hours, volunteer.opt_in_hours)
+        self.assertEqual(submission.comments, volunteer.comments)
+
+        # Try #3: Try to verify a submission with the same phone number fails
+        submission_dupe = self.create_submission()
+        response = self.client.post(
+            url_for('volunteers.verify', id=submission_dupe.id, gather='q'),
+            data={'Digits': '1'})
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(Volunteer.query.count(), 1)
+
     def test_json_view(self):
         submissions = [
             self.create_submission(phone_number='+1416967111{}'.format(n))
@@ -215,3 +247,24 @@ class CallsTests(unittest.TestCase):
         response = self.client.get(url_for('form_redirect'))
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.location, app.config['WEIRDNESS_SIGNUP_GOOGLE_FORM_URL'])
+
+    def test_protection(self):
+        protected_routes = (
+            # route, method, kwargs
+            ('volunteers.submit', 'post', {}),
+            ('volunteers.verify', 'post', {'id': 1}),
+            ('volunteers.json', 'get', {}),
+        )
+
+        try:
+            app.config['API_PASSWORD'] = 'my-secret-password'
+
+            for route, method, kwargs in protected_routes:
+                response = getattr(self.client, method)(url_for(
+                    route, password='incorrect', **kwargs))
+                self.assertEqual(
+                    response.status_code, 403,
+                    '{} returned a {}'.format(route, response.status_code))
+
+        finally:
+            app.config['API_PASSWORD'] = ''

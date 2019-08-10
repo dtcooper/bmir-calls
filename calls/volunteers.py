@@ -78,7 +78,7 @@ def submit():
     return Response(status=200)
 
 
-@volunteers.route('/submit/verify/<int:id>', methods=('POST', 'GET'))
+@volunteers.route('/submit/verify/<int:id>', methods=('POST',))
 @protected
 def verify(id):
     submission = Submission.query.filter_by(id=id).first_or_404()
