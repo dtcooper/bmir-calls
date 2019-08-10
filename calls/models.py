@@ -1,4 +1,5 @@
 import datetime
+import random
 
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql.expression import (
@@ -22,7 +23,7 @@ class VolunteerBase:
     name = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
-    opt_in_hours = db.Column(postgresql.ARRAY(db.Integer, dimensions=1), nullable=False, default=[])
+    opt_in_hours = db.Column(postgresql.ARRAY(db.SmallInteger, dimensions=1), nullable=False, default=[])
     comments = db.Column(db.Text, nullable=False, default='')
 
     def serialize(self):
@@ -142,6 +143,8 @@ class Submission(VolunteerBase, db.Model):
 
 
 class Volunteer(VolunteerBase, db.Model):
+    RANDOM_POOL_SIZE = 5
+
     __tablename__ = 'volunteers'
     submission_id = db.Column(db.Integer, nullable=False)
     updated = db.Column(db.DateTime(timezone=True), server_default=db.func.now(),
@@ -155,12 +158,22 @@ class Volunteer(VolunteerBase, db.Model):
     )
 
     @classmethod
-    def get_random_opted_in(cls):
+    def get_random_opted_in(cls, update_last_called=True):
         current_hour = datetime.datetime.now(app.config['SERVER_TZ']).hour
+        current_hour_smallint_array = cast([current_hour], db.ARRAY(db.SmallInteger))
+
+        # Take the N least recently called volunteers, and pick one at random
         volunteers = cls.query.filter(
-            cls.opt_in_hours.contains([current_hour])
-        ).order_by(nullsfirst(cls.last_called)).limit(5).all()
+            # Finds a currently opted in volunteer, and performs on the gin index :)
+            cls.opt_in_hours.contains(current_hour_smallint_array)
+        ).order_by(nullsfirst(cls.last_called), cls.id).limit(cls.RANDOM_POOL_SIZE).all()
 
-        print(volunteers)
+        volunteer = random.choice(volunteers)
 
-        #cls.query.filter(cls.tags.contains([tag]))
+        if update_last_called:
+            volunteer.last_called = datetime.datetime.now(app.config['SERVER_TZ'])
+            db.session.add(volunteer)
+            db.session.commit()
+
+        return volunteer
+

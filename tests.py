@@ -15,7 +15,7 @@ from calls.models import (
 )
 
 
-class CallsTests(unittest.TestCase):
+class BMIRCallsTests(unittest.TestCase):
     def setUp(self):
         testing_db_uri = make_url(app.config['SQLALCHEMY_DATABASE_URI'])
         testing_db_uri.database = app.config['SQLALCHEMY_DATABASE_NAME_TESTING']
