@@ -22,13 +22,15 @@ call_routing = Blueprint('call_routing', __name__, url_prefix='/routing')
 def outgoing():
     from_address = parse_sip_address(request.values.get('From'))
     to_address = parse_sip_address(request.values.get('To'))
-    if not from_address or to_address:
+    if not from_address or not to_address:
         return Response(status=400)
 
+    from_number = app.config['WEIRDNESS_NUMBER']
     phone_number = None
 
     # Broadcast phone dials out
     if from_address == app.config['BROADCAST_SIP_USERNAME']:
+        from_number = app.config['BROADCAST_NUMBER']
         phone_number = sanitize_phone_number(to_address)
 
     # Weirdness phone calls a random caller (unless we have cheat codes)
@@ -43,8 +45,7 @@ def outgoing():
                 phone_number = volunteer.phone_number
 
     if phone_number:
-        return render_xml('call.xml', to_number=phone_number,
-                          from_number=app.config['WEIRDNESS_NUMBER'])
+        return render_xml('call.xml', from_number=from_number, to_number=phone_number)
     else:
         return render_xml(
             'hang_up.xml',
