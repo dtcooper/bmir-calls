@@ -4,7 +4,7 @@ import pytz
 from flask import current_app as app
 from flask_sqlalchemy import SQLAlchemy
 
-from .utils import sanitize_phone_number
+from calls.utils import sanitize_phone_number
 
 
 db = SQLAlchemy()

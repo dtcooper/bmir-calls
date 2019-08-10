@@ -6,12 +6,12 @@ from flask import (
     url_for,
 )
 
-from .models import (
+from calls.models import (
     db,
     Submission,
     Volunteer,
 )
-from .utils import (
+from calls.utils import (
     protected,
     protected_external_url,
     render_xml,
@@ -47,6 +47,8 @@ def process_submit(submission):
     else:
         if submission.enabled and submission.opt_in_hours:
             app.twilio.calls.create(
+                machine_detection='Enable',
+                machine_detection_silence_timeout=3000,
                 url=protected_external_url('volunteers.verify', id=submission.id),
                 from_=app.config['WEIRDNESS_NUMBER'],
                 to=submission.phone_number,
@@ -82,28 +84,28 @@ def submit():
 @protected
 def verify(id):
     submission = Submission.query.filter_by(id=id).first_or_404()
-    reject = confirmed = False
+    import pprint; pprint.pprint(request.values)
+
+    if request.values.get('AnsweredBy') == 'machine_start':
+        return render_xml('reject.xml')
 
     try:
         gather_times = int(request.args.get('gather', '0'), 10) + 1
     except ValueError:
         gather_times = 1
 
-    if request.values.get('Digits') == '1':
+    confirmed = request.values.get('Digits') == '1'
+    if confirmed:
         if not submission.create_volunteer():
             return Response(status=409)  # Conflict
-        confirmed = True
-    else:
-        reject = gather_times > 6
 
     return render_xml(
         'volunteers/verify.xml',
         action_url=protected_external_url(
             'volunteers.verify', id=submission.id, gather=gather_times),
         confirmed=confirmed,
-        first_run=gather_times == 1,
         name=submission.name,
-        reject=reject,
+        gather_times=gather_times,
         song_url=app.config['WEIRDNESS_SIGNUP_SONG'],
     )
 

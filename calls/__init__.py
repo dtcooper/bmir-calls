@@ -8,8 +8,11 @@ from flask import (
     redirect,
 )
 
-from .models import db
-from .volunteers import volunteers
+from calls.models import db
+from calls.views import (
+    call_routing,
+    volunteers,
+)
 
 
 # Set up Flask app
@@ -32,6 +35,7 @@ app.twilio = TwilioClient(
 )
 
 # Register blueprints
+app.register_blueprint(call_routing)
 app.register_blueprint(volunteers)
 
 # Make sure reverse proxying from an https URL to http is considered secure.

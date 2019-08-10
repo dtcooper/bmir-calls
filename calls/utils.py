@@ -1,4 +1,5 @@
 from functools import wraps
+import re
 
 from twilio.base.exceptions import TwilioRestException
 
@@ -38,3 +39,18 @@ def protected_external_url(endpoint, *args, **kwargs):
     defaults = {'_external': True, 'password': app.config['API_PASSWORD']}
     defaults.update(kwargs)
     return url_for(endpoint, *args, **defaults)
+
+
+def parse_sip_address(address, number=False):
+    if isinstance(address, str):
+        match = re.search(r'^sip:([^@]+)@', address)
+        if match:
+            address = match.group(1)
+            if number:
+                address = sanitize_phone_number(address)
+
+            return address
+
+    return False
+
+    return match.group(1) if match else False

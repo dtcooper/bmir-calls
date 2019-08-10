@@ -1,25 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  {% if reject %}
-    <Hangup />
-  {% else %}
     {% if confirmed %}
-      <Say voice="alice">You are now enrolled to receive calls!</Say>
-      <Play>{{ song_url }}</Play>
-      <Hangup />
+        <Say>You are now enrolled to receive calls! Good-bye.</Say>
+        <Play>{{ song_url }}</Play>
+        <Hangup />
     {% else %}
-      <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
-        <Say voice="alice">
-        {% if first_run %}
-          Welcome to the B. M. I. R. F. M. phone experiment, {{ name }}.
+        {% set max_gather_times = 4 %}
+        {% if gather_times > max_gather_times %}
+            <Hangup />
+        {% else %}
+            <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
+                <Say>
+                {% if gather_times == 1 %}
+                    Hi {{ name }}. Welcome to the B M I R, F M phone experiment.
+                {% else %}
+                </Say>
+                    <Play>{{ song_url }}</Play>
+                <Say>
+                {% endif %}
+                If you would like to participate
+                {%- if gather_times > 1 %}
+                    in the B M I R phone experiment
+                {%- endif %}, press 1.
+                If you were not expecting this call, hang up.
+                {% if gather_times < max_gather_times %}
+                    To repeat this message, press any other key.
+                {% endif %}
+                </Say>
+            </Gather>
         {% endif %}
-          If you would like to participate
-          {%- if not first_run %}
-            in the B. M. I. R. phone experiment
-          {%- endif %}, press 1.
-          If you were not expecting this call, hang up.
-          To repeat this message, press any other key.
-        </Say>
-      </Gather>
     {% endif %}
-  {% endif %}
 </Response>
