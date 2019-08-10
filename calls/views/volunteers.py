@@ -84,7 +84,6 @@ def submit():
 @protected
 def verify(id):
     submission = Submission.query.filter_by(id=id).first_or_404()
-    import pprint; pprint.pprint(request.values)
 
     if request.values.get('AnsweredBy') == 'machine_start':
         return render_xml('hang_up.xml')
@@ -100,7 +99,7 @@ def verify(id):
             return Response(status=409)  # Conflict
 
     return render_xml(
-        'volunteers/verify.xml',
+        'verify.xml',
         action_url=protected_external_url(
             'volunteers.verify', id=submission.id, gather=gather_times),
         confirmed=confirmed,

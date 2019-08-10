@@ -165,8 +165,12 @@ class Volunteer(VolunteerBase, db.Model):
         # Take the N least recently called volunteers, and pick one at random
         volunteers = cls.query.filter(
             # Finds a currently opted in volunteer, and performs on the gin index :)
-            cls.opt_in_hours.contains(current_hour_smallint_array)
-        ).order_by(nullsfirst(cls.last_called), cls.id).limit(cls.RANDOM_POOL_SIZE).all()
+            cls.opt_in_hours.contains(current_hour_smallint_array),
+        ).order_by(nullsfirst(cls.last_called), cls.id).limit(
+            cls.RANDOM_POOL_SIZE).all()
+
+        if not volunteers:
+            return None
 
         volunteer = random.choice(volunteers)
 
@@ -176,4 +180,3 @@ class Volunteer(VolunteerBase, db.Model):
             db.session.commit()
 
         return volunteer
-

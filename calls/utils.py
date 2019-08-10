@@ -17,7 +17,7 @@ def sanitize_phone_number(phone_number):
         return app.twilio.lookups.phone_numbers(
             phone_number).fetch(country_code='US').phone_number
     except TwilioRestException:  # skip coverage
-        return False
+        return None
 
 
 def protected(route):
@@ -47,4 +47,4 @@ def parse_sip_address(address):
         if match:
             return match.group(1)
 
-    return False
+    return None

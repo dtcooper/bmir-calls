@@ -12,7 +12,7 @@
             <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
                 <Say>
                 {% if gather_times == 1 %}
-                    Hi {{ name }}. Welcome to the B M I R, F M phone experiment.
+                    Hi {{ name }}. Welcome to the B M I R F M phone experiment.
                 {% else %}
                 </Say>
                     <Play>{{ song_url }}</Play>
