@@ -87,7 +87,7 @@ def verify(id):
     import pprint; pprint.pprint(request.values)
 
     if request.values.get('AnsweredBy') == 'machine_start':
-        return render_xml('reject.xml')
+        return render_xml('hang_up.xml')
 
     try:
         gather_times = int(request.args.get('gather', '0'), 10) + 1
@@ -106,7 +106,7 @@ def verify(id):
         confirmed=confirmed,
         name=submission.name,
         gather_times=gather_times,
-        song_url=app.config['WEIRDNESS_SIGNUP_SONG'],
+        song_url=app.config['WEIRDNESS_SIGNUP_MUSIC'],
     )
 
 

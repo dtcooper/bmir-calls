@@ -1,4 +1,10 @@
 import datetime
+
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.sql.expression import (
+    cast,
+    nullsfirst,
+)
 import pytz
 
 from flask import current_app as app
@@ -16,7 +22,7 @@ class VolunteerBase:
     name = db.Column(db.String(255), nullable=False)
     email = db.Column(db.String(255), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
-    opt_in_hours = db.Column(db.ARRAY(db.SmallInteger, dimensions=1), nullable=False, default=[])
+    opt_in_hours = db.Column(postgresql.ARRAY(db.Integer, dimensions=1), nullable=False, default=[])
     comments = db.Column(db.Text, nullable=False, default='')
 
     def serialize(self):
@@ -147,3 +153,14 @@ class Volunteer(VolunteerBase, db.Model):
         db.Index('volunteers_eligibility_key', 'opt_in_hours', postgresql_using='gin'),
         db.Index('volunteers_phone_number_key', 'phone_number', unique=True),
     )
+
+    @classmethod
+    def get_random_opted_in(cls):
+        current_hour = datetime.datetime.now(app.config['SERVER_TZ']).hour
+        volunteers = cls.query.filter(
+            cls.opt_in_hours.contains([current_hour])
+        ).order_by(nullsfirst(cls.last_called)).limit(5).all()
+
+        print(volunteers)
+
+        #cls.query.filter(cls.tags.contains([tag]))

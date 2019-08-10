@@ -41,16 +41,10 @@ def protected_external_url(endpoint, *args, **kwargs):
     return url_for(endpoint, *args, **defaults)
 
 
-def parse_sip_address(address, number=False):
+def parse_sip_address(address):
     if isinstance(address, str):
         match = re.search(r'^sip:([^@]+)@', address)
         if match:
-            address = match.group(1)
-            if number:
-                address = sanitize_phone_number(address)
-
-            return address
+            return match.group(1)
 
     return False
-
-    return match.group(1) if match else False
