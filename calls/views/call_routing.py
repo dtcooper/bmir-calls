@@ -133,8 +133,8 @@ def incoming_weirdness_sms():
                 message = ('You have signed up for the BMIR Phone Experiment. '
                            'Text "NO MORE" to stop receiving calls.')
             else:
-                message = ('Call this number, text "SIGN UP" or go to to '
-                           'https://calls.bmir.org/ to sign up for the BMIR Phone Experiment.')
+                message = ('Text "SIGN UP" or go to to https://calls.bmir.org/ '
+                           'to sign up for the BMIR Phone Experiment.')
         else:
             message = 'Go to https://calls.bmir.org/ to sign up for BMIR Phone Experiment.'
 
