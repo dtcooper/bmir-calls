@@ -20,11 +20,8 @@ db = SQLAlchemy()
 class VolunteerBase:
     id = db.Column(db.Integer, primary_key=True)
     created = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
-    name = db.Column(db.String(255), nullable=False)
-    email = db.Column(db.String(255), nullable=False)
     phone_number = db.Column(db.String(20), nullable=False)
-    opt_in_hours = db.Column(postgresql.ARRAY(db.SmallInteger, dimensions=1), nullable=False, default=[])
-    comments = db.Column(db.Text, nullable=False, default='')
+    opt_in_hours = db.Column(postgresql.ARRAY(db.SmallInteger, dimensions=1), nullable=False, default=list(range(24)))
 
     def serialize(self):
         data = {col.name: getattr(self, col.name) for col in self.__table__.columns}
@@ -42,7 +39,7 @@ class VolunteerBase:
 
         return data
 
-    @db.validates('name', 'email', 'phone_number')
+    @db.validates('phone_number')
     def validate_code(self, key, value):
         max_len = getattr(self.__class__, key).prop.columns[0].type.length
         if value and len(value) > max_len:
@@ -50,13 +47,12 @@ class VolunteerBase:
         return value
 
     def __repr__(self):
-        return '<{} {} ({})>'.format(
-            self.__class__.__name__, self.phone_number, self.name)
+        return '<{} {}>'.format(
+            self.__class__.__name__, self.phone_number)
 
 
 class Submission(VolunteerBase, db.Model):
     __tablename__ = 'submissions'
-    enabled = db.Column(db.Boolean, nullable=False, default=True)
     timezone = db.Column(db.String(255), nullable=False, default='')
     valid_phone = db.Column(db.Boolean, nullable=False, default=True)
 
@@ -107,8 +103,8 @@ class Submission(VolunteerBase, db.Model):
                 datetime.time(hour=hour),
             )).astimezone(app.config['SERVER_TZ']).hour
 
-            # Form is in two hour chunks
-            opt_in_hours.extend([hour, (hour + 1) % 24])
+            for i in range(app.config['FORM_HOUR_CHUNK_SIZE']):
+                opt_in_hours.append((hour + i) % 24)
 
         kwargs.update({
             'opt_in_hours': sorted(opt_in_hours),
@@ -130,8 +126,8 @@ class Submission(VolunteerBase, db.Model):
 
     def create_volunteer(self):
         if all([
-            # Make sure we're enabled and have a valid phone, with no existing volunteer
-            self.enabled, self.opt_in_hours, self.valid_phone,
+            # Make sure we have a valid phone, with no existing volunteer
+            self.opt_in_hours, self.valid_phone,
             not bool(Volunteer.query.filter_by(phone_number=self.phone_number).first()),
         ]):
             volunteer = Volunteer(**self.get_volunteer_kwargs())

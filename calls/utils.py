@@ -17,6 +17,7 @@ def sanitize_phone_number(phone_number):
         return app.twilio.lookups.phone_numbers(
             phone_number).fetch(country_code='US').phone_number
     except TwilioRestException:  # skip coverage
+        app.logger.warn('Invalid phone number: {}'.format(phone_number))
         return None
 
 

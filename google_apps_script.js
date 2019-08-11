@@ -3,14 +3,10 @@ var SEND_DEBUG_EMAIL = false;
 var DEBUG_EMAIL = 'user@example.com';
 var API_PASSWORD = 'hackme';
 var SUBMIT_URL = 'https://example.com/volunteers/submit';
-
 // Item IDs for questions in form, use logItemIDs() in Apps Script to find these out
-var ENABLED_ID = 111111;
-var NAME_ID = 222222;
-var PHONE_NUMBER_ID = 333333;
-var OPT_IN_HOURS_ID = 444444;
-var TIMEZONE_ID = 555555;
-var COMMENTS_ID = 666666;
+var PHONE_NUMBER_ID = 111111;
+var OPT_IN_HOURS_ID = 222222;
+var TIMEZONE_ID = 333333;
 /* END USER SERVICEABLE PARTS */
 
 function logItemIDs() {
@@ -30,13 +26,9 @@ function getAnswer(response, itemId) {
 
 function parseFormResponse(response) {
   return {
-    'email': response.getRespondentEmail(),
-    'enabled': getAnswer(response, ENABLED_ID).toLowerCase().indexOf('yes') == 0,
-    'name': getAnswer(response, NAME_ID),
     'phone_number': getAnswer(response, PHONE_NUMBER_ID),
     'opt_in_hours': getAnswer(response, OPT_IN_HOURS_ID),
-    'timezone': getAnswer(response, TIMEZONE_ID),
-    'comments': getAnswer(response, COMMENTS_ID)
+    'timezone': getAnswer(response, TIMEZONE_ID)
   };
 }
 
@@ -49,7 +41,7 @@ function post(data) {
 
   if (SEND_DEBUG_EMAIL) {
     MailApp.sendEmail(
-      'dave@kupesoft.com', 'BMIR Calls Form Submit Debug',
+      DEBUG_EMAIL, 'BMIR Calls Form Submit Debug',
       JSON.stringify(data, null, 2));
   }
 

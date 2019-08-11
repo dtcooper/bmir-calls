@@ -21,31 +21,31 @@ from calls.utils import (
 volunteers = Blueprint('volunteers', __name__, url_prefix='/volunteers')
 
 
-def process_submit(submission):
-    if not submission.valid_phone:
-        return
+@volunteers.route('/submit', methods=('POST',))
+@protected
+def submit():
+    submission = Submission.create_from_json(request.get_json())
 
-    text_msg = None
-    form_redirect_url = url_for('form_redirect', _external=True)
+    if submission.valid_phone:
+        # Do we already have a volunteer?
+        volunteer = Volunteer.query.filter_by(
+            phone_number=submission.phone_number).first()
 
-    # Do we already have a volunteer?
-    volunteer = Volunteer.query.filter_by(
-        phone_number=submission.phone_number).first()
-
-    # A volunteer already exists for this phone number
-    if volunteer:
-        if submission.enabled and submission.opt_in_hours:
-            text_msg = 'Thanks for updating your submission.'
+        # A volunteer already exists for this phone number
+        if volunteer:
             for attr, value in submission.get_volunteer_kwargs().items():
                 setattr(volunteer, attr, value)
+
             db.session.add(volunteer)
+            db.session.commit()
+
+            app.twilio.messages.create(
+                body='Thanks for updating your BMIR Phone Experiment submission.',
+                from_=app.config['WEIRDNESS_NUMBER'],
+                to=submission.phone_number,
+            )
+
         else:
-            text_msg = ('You will no longer receive calls. To sign back up, go '
-                        'to: {}'.format(form_redirect_url))
-            db.session.delete(volunteer)
-        db.session.commit()
-    else:
-        if submission.enabled and submission.opt_in_hours:
             app.twilio.calls.create(
                 machine_detection='Enable',
                 machine_detection_silence_timeout=3000,
@@ -54,33 +54,10 @@ def process_submit(submission):
                 to=submission.phone_number,
             )
 
-        else:
-            text_msg = 'You will NOT receive calls. '
-
-            if not submission.enabled:
-                text_msg += 'Select "YES" to "Do you want to receive calls?"'
-            else:
-                text_msg += 'You must select hours under "Call me ONLY at these times"'
-
-            text_msg += ' Try again: {}'.format(form_redirect_url)
-
-    if text_msg:
-        app.twilio.messages.create(
-            body='{}\n-BMIR Phone Experiment'.format(text_msg),
-            from_=app.config['WEIRDNESS_NUMBER'],
-            to=submission.phone_number,
-        )
-
-
-@volunteers.route('/submit', methods=('POST',))
-@protected
-def submit():
-    submission = Submission.create_from_json(request.get_json())
-    process_submit(submission)
     return Response(status=200)
 
 
-@volunteers.route('/submit/verify/<int:id>', methods=('POST',))
+@volunteers.route('/submit/verify/<int:id>', methods=('GET', 'POST'))
 @protected
 def verify(id):
     submission = Submission.query.filter_by(id=id).first_or_404()
@@ -102,8 +79,8 @@ def verify(id):
         'verify.xml',
         action_url=protected_external_url(
             'volunteers.verify', id=submission.id, gather=gather_times),
+        phoned=bool(request.args.get('phoned')),
         confirmed=confirmed,
-        name=submission.name,
         gather_times=gather_times,
         song_url=app.config['WEIRDNESS_SIGNUP_MUSIC'],
     )

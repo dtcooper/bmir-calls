@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
     {% if confirmed %}
-        <Say>You are now enrolled to receive calls! Good-bye.</Say>
+        <Say>
+            You are now enrolled to receive calls! To stop participating.
+            Call this number back and follow the instructions.
+        </Say>
         <Play>{{ song_url }}</Play>
         <Hangup />
     {% else %}
@@ -9,14 +12,21 @@
         {% if gather_times > max_gather_times %}
             <Hangup />
         {% else %}
+            {% if phoned %}
+                <Say>
+                    Signing up over the phone means you could be called at any
+                    time, 24 hours a day. You will be called on this number. To
+                    select specific times you want to be called, hang up and go
+                    to calls dot B M I R dot org.
+                </Say>
+
+                <Pause length="1" />
+            {% endif %}
+
             <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
                 <Say>
-                {% if gather_times == 1 %}
-                    Hi {{ name }}. Welcome to the B M I R F M phone experiment.
-                {% else %}
-                </Say>
-                    <Play>{{ song_url }}</Play>
-                <Say>
+                {% if not phoned and gather_times == 1 %}
+                    Welcome to the B M I R F M phone experiment.
                 {% endif %}
                 If you would like to participate
                 {%- if gather_times > 1 %}
@@ -24,7 +34,7 @@
                 {%- endif %}, press 1.
                 If you were not expecting this call, hang up.
                 {% if gather_times < max_gather_times %}
-                    To repeat this message, press any other key.
+                    To repeat this message, press pound.
                 {% endif %}
                 </Say>
             </Gather>

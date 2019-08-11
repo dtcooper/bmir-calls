@@ -15,6 +15,7 @@ TWILIO_AUTH_TOKEN = 'hackme'
 SERVER_TZ = pytz.timezone('US/Pacific')
 # No known conversions in August, so let's pick a date during the event
 DATE_FOR_TZ_CONVERSION = datetime.date(2019, 8, 25)
+FORM_HOUR_CHUNK_SIZE = 3
 
 BROADCAST_NUMBER = '+15555554321'
 BROADCAST_SIP_USERNAME = 'broadcast'

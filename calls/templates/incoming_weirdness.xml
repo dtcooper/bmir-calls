@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    {% if confirm %}
+        <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
+            <Say>
+                Press 1 to confirm you would like to stop receiving calls.
+            </Say>
+        </Gather>
+    {% else %}
+        {% set max_gather_times = 4 %}
+        {% if gather_times > max_gather_times %}
+            <Hangup />
+        {% else %}
+
+            {% if gather_times == 1 %}
+                <Say>
+                    Welcome to the B M I R F M phone experiment.
+                    You are {% if not enrolled %}not{% endif %} currently enrolled.
+                </Say>
+                {# <Play>{{ song_url }}</Play> #}
+            {% endif %}
+
+            <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
+                <Say>
+                    {% if enrolled -%}
+                        To stop having your number called, press 1.
+                    {% else -%}
+                        To sign up to be called by the phone experiment, press 1.
+                    {% endif -%}
+                    To call the phone experiment, press 2.
+                    {% if gather_times < max_gather_times %}
+                        To repeat this message, press pound.
+                    {% endif %}
+                </Say>
+            </Gather>
+        {% endif %}
+    {% endif %}
+</Response>

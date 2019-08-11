@@ -45,17 +45,10 @@ class BMIRCallsTests(unittest.TestCase):
 
     def get_submit_json(self, **kwargs):
         json_data = {
-            'email': 'test-user@example.com',
-            'enabled': True,
-            'name': 'Test User',
             'phone_number': '416-967-1111',
-            'opt_in_hours': [
-                'midnight - 2am', '2am - 4am', '4am - 6am', '6am - 8am',
-                '8am - 10am', '10am - noon', 'noon - 2pm', '2pm - 4pm',
-                '4pm - 6pm', '6pm - 8pm', '8pm - 10pm', '10pm - midnight'
-            ],
+            'opt_in_hours': ['midnight - 3am', '3am - 6am', '6am - 9am', '9am - noon',
+                             'noon - 3pm', '3pm - 6pm', '6pm - 9pm', '9pm - midnight'],
             'timezone': '[GMT-07:00] Pacific Time // Black Rock City Time (US/Pacific)',
-            'comments': 'This is a test comment',
         }
         json_data.update(kwargs)
 
@@ -67,11 +60,7 @@ class BMIRCallsTests(unittest.TestCase):
     @staticmethod
     def create_submission(**kwargs):
         defaults = {
-            'email': 'test-user@example.com',
-            'enabled': True,
-            'name': 'Test User',
             'timezone': '[GMT-07:00] Pacific Time // Black Rock City Time (US/Pacific)',
-            'comments': 'This is a test comment',
             'phone_number': '+14169671111',
             'opt_in_hours': list(range(24)),
             'valid_phone': True,
@@ -94,12 +83,8 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(Volunteer.query.count(), 0)
 
         submission = Submission.query.first()
-        self.assertEqual(submission.name, 'Test User')
-        self.assertEqual(submission.email, 'test-user@example.com')
         self.assertEqual(submission.phone_number, '+14169671111')
         self.assertEqual(submission.opt_in_hours, list(range(24)))
-        self.assertEqual(submission.comments, 'This is a test comment')
-        self.assertTrue(submission.enabled)
         self.assertEqual(
             submission.timezone,
             '[GMT-07:00] Pacific Time // Black Rock City Time (US/Pacific)',
@@ -108,85 +93,55 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
 
     def test_form_submit_additional_cases(self):
-        # Try 1: Empty values
+        # Try 1: Empty timezone, minimal opt in
         response = self.client.post(
             url_for('volunteers.submit'),
-            json=self.get_submit_json(opt_in_hours=None, timezone=None, comments=None))
+            json=self.get_submit_json(opt_in_hours=['midnight - 3am'], timezone=None))
         self.assertEqual(response.status_code, 200)
 
         self.assertEqual(Submission.query.count(), 1)
         self.assertEqual(Volunteer.query.count(), 0)
         submission = Submission.query.first()
-        self.assertEqual(submission.name, 'Test User')
-        self.assertEqual(submission.email, 'test-user@example.com')
         self.assertEqual(submission.phone_number, '+14169671111')
-        self.assertEqual(submission.opt_in_hours, [])
-        self.assertEqual(submission.comments, '')
+        self.assertEqual(submission.opt_in_hours, [0, 1, 2])
         self.assertEqual(submission.timezone, '')
-        self.assertTrue(submission.enabled)
-        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
-        self.assertEqual(self.twilio_mock.messages.create.call_count, 1)
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 0)
 
-        # Try 2: We have time slots, but now we're disabled
-        response = self.client.post(
-            url_for('volunteers.submit'),
-            json=self.get_submit_json(opt_in_hours=['noon - 2pm'], enabled=False))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(Submission.query.count(), 2)
-        self.assertEqual(Volunteer.query.count(), 0)
-        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
-        self.assertEqual(self.twilio_mock.messages.create.call_count, 2)
-
-        # Try 3: Invalid phone number, nothing happens
+        # Try 2: Invalid phone number, nothing happens
         with patch('calls.models.sanitize_phone_number', lambda _: False):
             response = self.client.post(
                 url_for('volunteers.submit'),
                 json=self.get_submit_json(phone_number='hi mom!'))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(Submission.query.count(), 3)
+        self.assertEqual(Submission.query.count(), 2)
         self.assertEqual(Volunteer.query.count(), 0)
         submission = Submission.query.order_by(Submission.id.desc()).first()
         self.assertFalse(submission.valid_phone)
-        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
-        self.assertEqual(self.twilio_mock.messages.create.call_count, 2)
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 0)
 
         # Now let's create a volunteer with the same phone number
         submission = self.create_submission()
         volunteer = submission.create_volunteer()
-        self.assertNotEqual(volunteer.name, 'Updated User')
-        self.assertEqual(Submission.query.count(), 4)
+        self.assertEqual(volunteer.opt_in_hours, list(range(24)))
+        self.assertEqual(Submission.query.count(), 3)
         self.assertEqual(Volunteer.query.count(), 1)
 
-        # Try 4: Volunteer exists
+        # Try 3: Volunteer exists, we update and text them
         response = self.client.post(
             url_for('volunteers.submit'),
-            json=self.get_submit_json(name='Updated User', timezone='invalid'))
+            json=self.get_submit_json(opt_in_hours=['noon - 3pm'], timezone='invalid'))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(Submission.query.count(), 5)
+        self.assertEqual(Submission.query.count(), 4)
         self.assertEqual(Volunteer.query.count(), 1)
         volunteer = Volunteer.query.first()
-        self.assertEqual(volunteer.name, 'Updated User')
-        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
-        self.assertEqual(self.twilio_mock.messages.create.call_count, 3)
-
-        # Try 5: Disable
-        response = self.client.post(
-            url_for('volunteers.submit'), json=self.get_submit_json(enabled=False))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(Submission.query.count(), 6)
-        self.assertEqual(Volunteer.query.count(), 0)
-        self.assertEqual(self.twilio_mock.calls.create.call_count, 0)
-        self.assertEqual(self.twilio_mock.messages.create.call_count, 4)
+        self.assertEqual(volunteer.opt_in_hours, [12, 13, 14])
+        self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
+        self.assertEqual(self.twilio_mock.messages.create.call_count, 1)
 
     def test_column_max_size(self):
-        submission = self.create_submission(
-            name='a' * 500,
-            phone_number='1' * 500,
-            email='a@{}.com'.format('b' * 500),
-        )
-
-        self.assertEqual(len(submission.name), 255)
-        self.assertEqual(len(submission.email), 255)
+        submission = self.create_submission(phone_number='1' * 500)
         self.assertEqual(len(submission.phone_number), 20)
 
     def test_verify(self):
@@ -195,6 +150,13 @@ class BMIRCallsTests(unittest.TestCase):
 
         # Try #1: Initial TwiML
         response = self.client.post(url_for('volunteers.verify', id=submission.id))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Volunteer.query.count(), 0)
+
+        # Try #2: Answered by machine
+        response = self.client.post(
+            url_for('volunteers.verify', id=submission.id),
+            data={'AnsweredBy': 'machine_start'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Volunteer.query.count(), 0)
 
@@ -207,16 +169,13 @@ class BMIRCallsTests(unittest.TestCase):
 
         volunteer = Volunteer.query.first()
         self.assertEqual(submission.id, volunteer.submission_id)
-        self.assertEqual(submission.name, volunteer.name)
-        self.assertEqual(submission.email, volunteer.email)
         self.assertEqual(submission.phone_number, volunteer.phone_number)
         self.assertEqual(submission.opt_in_hours, volunteer.opt_in_hours)
-        self.assertEqual(submission.comments, volunteer.comments)
 
         # Try #3: Try to verify a submission with the same phone number fails
         submission_dupe = self.create_submission()
         response = self.client.post(
-            url_for('volunteers.verify', id=submission_dupe.id, gather='q'),
+            url_for('volunteers.verify', id=submission_dupe.id),
             data={'Digits': '1'})
         self.assertEqual(response.status_code, 409)
         self.assertEqual(Volunteer.query.count(), 1)
@@ -252,8 +211,11 @@ class BMIRCallsTests(unittest.TestCase):
         protected_routes = (
             # route, method, kwargs
             ('volunteers.submit', 'post', {}),
+            ('volunteers.verify', 'get', {'id': 1}),
             ('volunteers.verify', 'post', {'id': 1}),
             ('volunteers.json', 'get', {}),
+            ('call_routing.outgoing', 'post', {}),
+            ('call_routing.incoming_weirdness', 'post', {}),
         )
 
         try:
