@@ -1,6 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Dial ringTone="uk" callerId="{{ from_number }}">
-        {{ to_number }}
+    <Dial
+        answerOnBridge="true"
+        callerId="{{ from_number }}"
+        {% if record %}record="record-from-answer" trim="trim-silence"{% endif %}
+        {% if timeout %}timeout="{{ timeout }}"{% endif %}
+        {% if action_url %}action="{{ action_url }}"{% endif %}
+    >
+        {% if to_sip_address %}
+            <Sip>{{ to_sip_address }}</Sip>
+        {% else %}
+            <Number {% if whisper_url %}url="{{ whisper_url }}"{% endif %}>{{ to_number }}</Number>
+        {% endif %}
     </Dial>
 </Response>

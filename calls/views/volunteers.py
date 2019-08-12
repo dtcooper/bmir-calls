@@ -3,7 +3,6 @@ from flask import (
     current_app as app,
     request,
     Response,
-    url_for,
 )
 
 from calls.models import (
@@ -12,6 +11,7 @@ from calls.models import (
     Volunteer,
 )
 from calls.utils import (
+    get_gather_times,
     protected,
     protected_external_url,
     render_xml,
@@ -65,10 +65,7 @@ def verify(id):
     if request.values.get('AnsweredBy') == 'machine_start':
         return render_xml('hang_up.xml')
 
-    try:
-        gather_times = int(request.args.get('gather', '0'), 10) + 1
-    except ValueError:
-        gather_times = 1
+    gather_times = get_gather_times()
 
     confirmed = request.values.get('Digits') == '1'
     if confirmed:

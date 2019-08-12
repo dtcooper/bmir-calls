@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    {% if message %}
-        <Say>{{ message }}</Say>
-        <Hangup />
-    {% else %}
+    {% if not message and not music_url %}
         <Reject />
+    {% else %}
+        {% if message %}
+            <Say>{{ message }}</Say>
+        {% endif %}
+        {% if music_url %}
+            <Play>{{ music_url }}</Play>
+        {% endif %}
+        <Hangup />
     {% endif %}
 </Response>

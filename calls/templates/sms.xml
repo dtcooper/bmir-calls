@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Message>{{ message }}</Message>
+    {% if message is iterable and message is not string %}
+        {% for msg in message %}
+            <Message>{{ msg }}</Message>
+        {% endfor %}
+    {% else %}
+        <Message>{{ message }}</Message>
+    {% endif %}
 </Response>

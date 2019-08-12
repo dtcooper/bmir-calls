@@ -17,6 +17,8 @@ SERVER_TZ = pytz.timezone('US/Pacific')
 DATE_FOR_TZ_CONVERSION = datetime.date(2019, 8, 25)
 FORM_HOUR_CHUNK_SIZE = 3
 
+TWILIO_SIP_DOMAIN = 'example.sip.us1.twilio.com'
+
 BROADCAST_NUMBER = '+15555554321'
 BROADCAST_SIP_USERNAME = 'broadcast'
 

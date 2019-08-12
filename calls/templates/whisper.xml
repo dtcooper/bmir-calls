@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    {% if confirmed %}
+        <Say>
+            <prosody rate="x-fast">
+                Your call may be monitored for quality assurance purposes.
+            </prosody>
+        </Say>
+
+        {# Give them a second to hang up after recording consent... #}
+        <Pause length="1" />
+    {% elif has_gathered %}
+        <Hangup />
+    {% else %}
+        <Gather timeout="5" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
+            <Say>
+                You are receiving a call from B M I R, press any key to accept.
+            </Say>
+        </Gather>
+    {% endif %}
+</Response>

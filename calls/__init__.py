@@ -6,6 +6,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import (
     Flask,
     redirect,
+    request,
 )
 
 from calls.models import db
@@ -40,7 +41,7 @@ app.register_blueprint(volunteers)
 
 # Make sure reverse proxying from an https URL to http is considered secure.
 # Gunicorn does this automatically, but Flask's development server does not.
-if app.config['DEBUG']:
+if app.debug:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 
@@ -61,3 +62,18 @@ def health():
 @app.route('/')
 def form_redirect():
     return redirect(app.config['WEIRDNESS_SIGNUP_GOOGLE_FORM_URL'])
+
+
+if app.debug and os.environ.get('PRINT_REQUESTS'):
+    @app.before_request
+    def before():
+        print(request.headers)
+        import pprint
+        pprint.pprint(request.values)
+
+    @app.after_request
+    def after(response):
+        print(response.status)
+        print(response.headers)
+        print(response.get_data().decode('utf-8'))
+        return response
