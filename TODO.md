@@ -6,3 +6,4 @@
 * Gathers don't need to run N times, their <Say> XML tags can have repeats
     -> Remove utils.py:get_gather_times() helper
 * Tests for call_routing.py
+* Last updated timestamp propagating so no one gets called twice?
