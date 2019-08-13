@@ -25,7 +25,7 @@
                     {% if enrolled -%}
                         To stop having your number called, press 1.
                     {% else -%}
-                        To sign up to be called by the phone experiment, press 1.
+                        To learn more about signing up, press 1.
                     {% endif -%}
                     {% if gather_times < max_gather_times %}
                         To repeat this message, press pound.
