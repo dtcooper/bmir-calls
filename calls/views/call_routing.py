@@ -189,14 +189,14 @@ def incoming_weirdness_sms():
 
     volunteer = Volunteer.query.filter_by(phone_number=from_number).first()
     if volunteer:
-        if any(phrase in incoming_message for phrase in ('fuck off', 'duck off', 'fuckoff')):
+        if any(phrase in incoming_message for phrase in ('go away', 'goaway')):
             db.session.delete(volunteer)
             db.session.commit()
 
             message = ('You will no longer receive calls from the BMIR Phone Experiment.',
                        'To sign back up, go to https://calls.bmir.org/ or text "SIGN UP".')
         else:
-            message = ('Text "FUCK OFF" to stop receiving calls from the BMIR '
+            message = ('Text "GO AWAY" to stop receiving calls from the BMIR '
                        'Phone Experiment.')
     else:
         if from_number:
@@ -207,7 +207,7 @@ def incoming_weirdness_sms():
                 submission.create_volunteer()
 
                 message = ('You have signed up for the BMIR Phone Experiment! '
-                           'Text "FUCK OFF" to stop receiving calls.',
+                           'Text "GO AWAY" to stop receiving calls.',
                            'NOTE: you could receive a calls 24 hours a day. To select '
                            'times of day to receive calls, go to https://calls.bmir.org/')
             else:
