@@ -60,7 +60,7 @@ class Submission(VolunteerBase, db.Model):
         kwargs = {
             name: getattr(self, name)
             for name, column in VolunteerBase.__dict__.items()
-            if isinstance(column, db.Column)
+            if isinstance(column, db.Column) and name != 'created'
         }
         kwargs['submission_id'] = kwargs.pop('id')
 
