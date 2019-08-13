@@ -7,3 +7,4 @@
     -> Remove utils.py:get_gather_times() helper
 * Tests for call_routing.py
 * Last updated timestamp propagating so no one gets called twice?
+* After a call to broadcast, the opportunity to sign up for weirdness
