@@ -50,7 +50,7 @@ def outgoing_weirdness():
         return render_xml(
             'hang_up.xml',
             message=('Congratulations! You have won! You will receive a FREE '
-                     'Microsoft Zune and Nintendo 64 in 3 to 5 business days.'),
+                     'Microsoft Zune in 3 to 5 business days.'),
             music_url=app.config['WEIRDNESS_SIGNUP_MUSIC'])
     else:
         is_broadcast = parse_sip_address(
