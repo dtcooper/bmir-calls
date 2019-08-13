@@ -89,7 +89,7 @@ def outgoing_weirdness():
                 whisper_url=protected_external_url('call_routing.whisper'))
 
 
-@call_routing.route('/outgoing/whisper', methods=('POST', 'GET'))
+@call_routing.route('/outgoing/whisper', methods=('POST',))
 @protected
 def whisper():
     return render_xml(
@@ -133,9 +133,7 @@ def outgoing_broadcast():
 @call_routing.route('/incoming/weirdness', methods=('POST',))
 @protected
 def incoming_weirdness():
-    # TODO: if from_number is none, then say a message saying you must provide
-    # a caller ID
-    from_number = sanitize_phone_number(request.values.get('From', ''))
+    from_number = sanitize_phone_number(request.values.get('From'))
     if not from_number:
         return render_xml(
             'hang_up.xml',

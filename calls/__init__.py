@@ -64,7 +64,7 @@ def form_redirect():
     return redirect(app.config['WEIRDNESS_SIGNUP_GOOGLE_FORM_URL'])
 
 
-if app.debug and os.environ.get('PRINT_REQUESTS'):
+if app.debug and os.environ.get('PRINT_REQUESTS'):  # skip coverage
     @app.before_request
     def before():
         print(request.headers)

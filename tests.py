@@ -30,6 +30,9 @@ class BMIRCallsTests(unittest.TestCase):
             'SQLALCHEMY_DATABASE_URI': str(testing_db_uri),
             'API_PASSWORD': '',
             'SERVER_TZ': pytz.timezone('US/Pacific'),
+            'BROADCAST_SIP_USERNAME': 'broadcast',
+            'TWILIO_SIP_DOMAIN': 'domain',
+            'WEIRDNESS_SIP_USERNAME': 'weirdness',
         })
 
         self.context = app.app_context()
@@ -70,6 +73,11 @@ class BMIRCallsTests(unittest.TestCase):
         db.session.add(submission)
         db.session.commit()
         return submission
+
+    @classmethod
+    def create_volunteer(cls, submission=None):
+        submission = cls.create_submission()
+        return submission.create_volunteer()
 
     def test_form_submit(self):
         self.assertEqual(Submission.query.count(), 0)
@@ -230,3 +238,94 @@ class BMIRCallsTests(unittest.TestCase):
 
         finally:
             app.config['API_PASSWORD'] = ''
+
+    def test_whisper(self):
+        response = self.client.post(url_for('call_routing.whisper'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'You are receiving a call', response.data)
+
+    def test_outgoing_unknown_sip_addr(self):
+        response = self.client.post(
+            url_for('call_routing.outgoing'),
+            data={'From': 'sip:unknown@domain'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Invalid SIP address.', response.data)
+
+    @patch('random.randint')
+    def test_outgoing_broadcast(self, randint):
+        # Try #1 + #2: Invalid number
+        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = None
+        response = self.client.post(
+            url_for('call_routing.outgoing'),
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:0114169671111@domain'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Your call cannot be completed as dialed.', response.data)
+        response = self.client.post(
+            url_for('call_routing.outgoing'), data={'From': 'sip:broadcast@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Your call cannot be completed as dialed.', response.data)
+
+        # Try #3: Outgoing number
+        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14169671111'
+        response = self.client.post(
+            url_for('call_routing.outgoing'),
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:0014169671111@domain'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'+14169671111', response.data)
+
+        # Try #4: # cheat code
+        response = self.client.post(
+            url_for('call_routing.outgoing'),
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:%23@domain'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'weirdness@domain', response.data)
+
+        # Try #5: * cheat code, routes to volunteer
+        self.create_volunteer()
+        response = self.client.post(
+            url_for('call_routing.outgoing'),
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:%2A@domain'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'+14169671111', response.data)
+
+        # Since we're broadcast outgoing, no random shuffle here
+        randint.assert_not_called()
+
+    @patch('random.randint')
+    def test_outgoing_weirdness(self, randint):
+        randint.return_value = 2  # Don't call broadcast
+
+        # Try #1: No volunteers
+        response = self.client.post(
+            url_for('call_routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Thanks for playing!', response.data)
+
+        # Try 2: With a volunteer
+        volunteer = self.create_volunteer()
+        self.assertIsNone(volunteer.last_called)
+        response = self.client.post(
+            url_for('call_routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'+14169671111', response.data)
+        self.assertIsNotNone(volunteer.last_called)
+
+        # Try 3: Hung up on, 30s after a call
+        response = self.client.post(
+            url_for('call_routing.outgoing'),
+            data={'From': 'sip:weirdness@domain', 'DialCallStatus': 'completed',
+                  'DialCallDuration': '60'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Microsoft Zune', response.data)
+
+        # Try 4: Randomly calls broadcast phone
+        randint.return_value = 1
+        response = self.client.post(
+            url_for('call_routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'broadcast@domain', response.data)
