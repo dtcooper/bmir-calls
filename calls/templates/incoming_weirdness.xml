@@ -27,7 +27,6 @@
                     {% else -%}
                         To sign up to be called by the phone experiment, press 1.
                     {% endif -%}
-                    To call the phone experiment, press 2.
                     {% if gather_times < max_gather_times %}
                         To repeat this message, press pound.
                     {% endif %}
