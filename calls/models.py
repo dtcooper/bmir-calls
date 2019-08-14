@@ -150,7 +150,8 @@ class Volunteer(VolunteerBase, db.Model):
     __table_args__ = (
         # XXX https://stackoverflow.com/a/37403848
         db.Index('volunteers_phone_number_key', 'phone_number', unique=True),
-        db.Index('volunteers_last_called_key', last_called),
+        db.Index('volunteers_last_called_key', last_called,
+                 postgresql_ops={'last_called': 'ASC NULLS FIRST'})
     )
 
     @classmethod
