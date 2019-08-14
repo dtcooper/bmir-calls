@@ -49,6 +49,13 @@ if app.debug:
 @app.cli.command('init-db', help='Initialize the DB.')
 def init_db():
     with app.app_context():
+        if app.config['ENV'] != 'development':
+            confirm = input('Your flask environment is {}. Are you sure '
+                            '(y/n)? '.format(app.config['ENV']))
+            if not confirm.strip().lower().startswith('y'):
+                print('Aborting.')
+                return
+
         db.drop_all()
         db.create_all()
         db.session.commit()
