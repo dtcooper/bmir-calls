@@ -149,8 +149,8 @@ class Volunteer(VolunteerBase, db.Model):
 
     __table_args__ = (
         # XXX https://stackoverflow.com/a/37403848
-        db.Index('volunteers_eligibility_key', 'opt_in_hours', postgresql_using='gin'),
         db.Index('volunteers_phone_number_key', 'phone_number', unique=True),
+        db.Index('volunteers_last_called_key', last_called),
     )
 
     @classmethod
