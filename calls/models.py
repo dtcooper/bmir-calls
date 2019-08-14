@@ -173,3 +173,31 @@ class Volunteer(VolunteerBase, db.Model):
             db.session.commit()
 
         return volunteer
+
+
+class UserConfig(db.Model):
+    __tablename__ = 'user_config'
+    DEFAULTS = {'broadcast_incoming_enabled': True}
+
+    key = db.Column(db.String(40), primary_key=True)
+    value = db.Column(postgresql.JSONB())
+
+    @classmethod
+    def get(cls, key):
+        config = cls.query.filter_by(key=key).first()
+        return config.value if config else cls.DEFAULTS.get(key)
+
+    @classmethod
+    def set(cls, key, value):
+        config = cls.query.filter_by(key=key).first()
+
+        if config:
+            config.value = value
+        else:
+            config = cls(key=key, value=value)
+
+        db.session.add(config)
+        db.session.commit()
+
+    def __repr__(self):
+        return '<UserConfig {}={!r}>'.format(self.key, self.value)

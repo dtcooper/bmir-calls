@@ -10,9 +10,18 @@ from flask import (
 )
 
 from calls.models import db
+from calls.utils import (
+    parse_sip_address,
+    protected,
+    render_xml,
+)
+
 from calls.views import (
-    routing,
+    broadcast,
+    outgoing_broadcast,
+    outgoing_weirdness,
     volunteers,
+    weirdness,
 )
 
 
@@ -36,8 +45,9 @@ app.twilio = TwilioClient(
 )
 
 # Register blueprints
-app.register_blueprint(routing)
+app.register_blueprint(broadcast)
 app.register_blueprint(volunteers)
+app.register_blueprint(weirdness)
 
 # Make sure reverse proxying from an https URL to http is considered secure.
 # Gunicorn does this automatically, but Flask's development server does not.
@@ -69,6 +79,19 @@ def health():
 @app.route('/')
 def form_redirect():
     return redirect(app.config['WEIRDNESS_SIGNUP_GOOGLE_FORM_URL'])
+
+
+# SIP domains on Twilio route to the same URL, so basic routing done here
+@app.route('/outgoing', methods=('POST',))
+@protected
+def outgoing():
+    from_address = parse_sip_address(request.values.get('From'))
+    if from_address == app.config['BROADCAST_SIP_USERNAME']:
+        return outgoing_broadcast()
+    elif from_address == app.config['WEIRDNESS_SIP_USERNAME']:
+        return outgoing_weirdness()
+    else:
+        return render_xml('hang_up.xml', message='Invalid SIP address.')
 
 
 if app.debug and os.environ.get('PRINT_REQUESTS'):  # skip coverage

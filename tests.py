@@ -11,6 +11,7 @@ from calls import app
 from calls.models import (
     db,
     Submission,
+    UserConfig,
     Volunteer,
 )
 
@@ -76,7 +77,8 @@ class BMIRCallsTests(unittest.TestCase):
 
     @classmethod
     def create_volunteer(cls, submission=None):
-        submission = cls.create_submission()
+        if not submission:
+            submission = cls.create_submission()
         return submission.create_volunteer()
 
     def test_form_submit(self):
@@ -101,7 +103,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
 
     def test_form_submit_additional_cases(self):
-        # Try 1: Empty timezone, minimal opt in
+        # Empty timezone, minimal opt in
         response = self.client.post(
             url_for('volunteers.submit'),
             json=self.get_submit_json(opt_in_hours=['midnight - 3am'], timezone=None))
@@ -116,7 +118,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
         self.assertEqual(self.twilio_mock.messages.create.call_count, 0)
 
-        # Try 2: Invalid phone number, nothing happens
+        # Invalid phone number, nothing happens
         with patch('calls.models.sanitize_phone_number', lambda _: False):
             response = self.client.post(
                 url_for('volunteers.submit'),
@@ -136,7 +138,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(Submission.query.count(), 3)
         self.assertEqual(Volunteer.query.count(), 1)
 
-        # Try 3: Volunteer exists, we update and text them
+        # Volunteer exists, we update and text them
         response = self.client.post(
             url_for('volunteers.submit'),
             json=self.get_submit_json(opt_in_hours=['noon - 3pm'], timezone='invalid'))
@@ -156,19 +158,19 @@ class BMIRCallsTests(unittest.TestCase):
         submission = self.create_submission()
         self.assertEqual(Volunteer.query.count(), 0)
 
-        # Try #1: Initial TwiML
+        # Initial TwiML
         response = self.client.post(url_for('volunteers.verify', id=submission.id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Volunteer.query.count(), 0)
 
-        # Try #2: Answered by machine
+        # Answered by machine
         response = self.client.post(
             url_for('volunteers.verify', id=submission.id),
             data={'AnsweredBy': 'machine_start'})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Volunteer.query.count(), 0)
 
-        # Try #2: User pressed '1', Create new volunteer (and test invalid gather arg)
+        # User pressed '1', Create new volunteer (and test invalid gather arg)
         response = self.client.post(
             url_for('volunteers.verify', id=submission.id, gather='q'),
             data={'Digits': '1'})
@@ -180,7 +182,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(submission.phone_number, volunteer.phone_number)
         self.assertEqual(submission.opt_in_hours, volunteer.opt_in_hours)
 
-        # Try #3: Try to verify a submission with the same phone number fails
+        # Try to verify a submission with the same phone number fails
         submission_dupe = self.create_submission()
         response = self.client.post(
             url_for('volunteers.verify', id=submission_dupe.id),
@@ -218,12 +220,17 @@ class BMIRCallsTests(unittest.TestCase):
     def test_protection(self):
         protected_routes = (
             # route, method, kwargs
+            ('outgoing', 'post', {}),
+            ('broadcast.incoming', 'post', {}),
+            ('broadcast.sms', 'post', {}),
             ('volunteers.submit', 'post', {}),
             ('volunteers.verify', 'get', {'id': 1}),
             ('volunteers.verify', 'post', {'id': 1}),
             ('volunteers.json', 'get', {}),
-            ('routing.outgoing', 'post', {}),
-            ('routing.incoming_weirdness', 'post', {}),
+            ('weirdness.outgoing', 'post', {}),
+            ('weirdness.whisper', 'post', {}),
+            ('weirdness.incoming', 'post', {}),
+            ('weirdness.sms', 'post', {}),
         )
 
         try:
@@ -239,55 +246,53 @@ class BMIRCallsTests(unittest.TestCase):
         finally:
             app.config['API_PASSWORD'] = ''
 
-    def test_whisper(self):
-        response = self.client.post(url_for('routing.whisper'))
+    def test_weirdness_whisper(self):
+        response = self.client.post(url_for('weirdness.whisper'))
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'You are receiving a call', response.data)
 
     def test_outgoing_unknown_sip_addr(self):
         response = self.client.post(
-            url_for('routing.outgoing'),
-            data={'From': 'sip:unknown@domain'},
-        )
+            url_for('outgoing'), data={'From': 'sip:unknown@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Invalid SIP address.', response.data)
 
     @patch('random.randint')
-    def test_outgoing_broadcast(self, randint):
-        # Try #1 + #2: Invalid number
+    def test_broadcast_outgoing(self, randint):
+        # Invalid number
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = None
         response = self.client.post(
-            url_for('routing.outgoing'),
+            url_for('outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:0114169671111@domain'},
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Your call cannot be completed as dialed.', response.data)
         response = self.client.post(
-            url_for('routing.outgoing'), data={'From': 'sip:broadcast@domain'})
+            url_for('outgoing'), data={'From': 'sip:broadcast@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Your call cannot be completed as dialed.', response.data)
 
-        # Try #3: Outgoing number
+        # Outgoing number
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14169671111'
         response = self.client.post(
-            url_for('routing.outgoing'),
+            url_for('outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:0014169671111@domain'},
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'+14169671111', response.data)
 
-        # Try #4: # cheat code
+        # # cheat code
         response = self.client.post(
-            url_for('routing.outgoing'),
+            url_for('outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:%23@domain'},
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'weirdness@domain', response.data)
 
-        # Try #5: * cheat code, routes to volunteer
+        # * cheat code, routes to volunteer
         self.create_volunteer()
         response = self.client.post(
-            url_for('routing.outgoing'),
+            url_for('outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:%2A@domain'},
         )
         self.assertEqual(response.status_code, 200)
@@ -296,36 +301,145 @@ class BMIRCallsTests(unittest.TestCase):
         # Since we're broadcast outgoing, no random shuffle here
         randint.assert_not_called()
 
+    def test_broadcast_incoming(self):
+        response = self.client.post(url_for('broadcast.incoming'))
+        self.assertEqual(response.status_code, 501)
+
+    def test_broadcast_sms(self):
+        response = self.client.post(url_for('broadcast.sms'))
+        self.assertEqual(response.status_code, 501)
+
     @patch('random.randint')
-    def test_outgoing_weirdness(self, randint):
+    def test_weirdness_outgoing(self, randint):
         randint.return_value = 2  # Don't call broadcast
 
-        # Try #1: No volunteers
+        # No volunteers
         response = self.client.post(
-            url_for('routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+            url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Thanks for playing!', response.data)
 
-        # Try 2: With a volunteer
+        # With a volunteer
         volunteer = self.create_volunteer()
         self.assertIsNone(volunteer.last_called)
         response = self.client.post(
-            url_for('routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+            url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'+14169671111', response.data)
         self.assertIsNotNone(volunteer.last_called)
 
-        # Try 3: Hung up on, 30s after a call
+        # Hung up on, 30s after a call
         response = self.client.post(
-            url_for('routing.outgoing'),
+            url_for('outgoing'),
             data={'From': 'sip:weirdness@domain', 'DialCallStatus': 'completed',
                   'DialCallDuration': '60'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Microsoft Zune', response.data)
 
-        # Try 4: Randomly calls broadcast phone
+        # Randomly calls broadcast phone
         randint.return_value = 1
+        UserConfig.set('broadcast_incoming_enabled', True)
         response = self.client.post(
-            url_for('routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+            url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'broadcast@domain', response.data)
+
+        # Unless broadcast phone is disabled
+        UserConfig.set('broadcast_incoming_enabled', False)
+        response = self.client.post(
+            url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'+14169671111', response.data)
+
+    def test_weirdness_incoming(self):
+        # Unknown number
+        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = None
+        response = self.client.post(url_for('weirdness.incoming'),
+                                    data={'From': '+15555551234'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Call with your caller ID unblocked to get through', response.data)
+
+        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14164390000'
+
+        # First run through of menu
+        response = self.client.post(
+            url_for('weirdness.incoming'), data={'From': '14164390000'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'You are not currently enrolled.', response.data)
+
+        # Second run through minimal <Say>
+        response = self.client.post(url_for('weirdness.incoming', gather=1),
+                                    data={'From': '14164390000'})
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(b'You are not currently enrolled.', response.data)
+
+        # Press 1, which redirects to volunteers.verify
+        self.assertEqual(Submission.query.count(), 0)
+        response = self.client.post(url_for('weirdness.incoming'),
+                                    data={'From': '14164390000', 'Digits': '1'})
+        self.assertEqual(Submission.query.count(), 1)
+        submission = Submission.query.first()
+        self.assertEqual(submission.phone_number, '+14164390000')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(url_for('volunteers.verify', id=submission.id), response.location)
+        self.assertIn('phoned=y', response.location)
+
+        self.create_volunteer(submission)
+
+        # Now we call already as a volunteer, and press 1
+        response = self.client.post(url_for('weirdness.incoming'),
+                                    data={'From': '+14164390000', 'Digits': '1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Press 1 to confirm you would like to stop receiving calls.',
+                      response.data)
+        self.assertEqual(Volunteer.query.count(), 1)
+
+        # Now delete
+        response = self.client.post(url_for('weirdness.incoming', confirm='y'),
+                                    data={'From': '+14164390000', 'Digits': '1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'You will no longer receive calls.', response.data)
+        self.assertEqual(Volunteer.query.count(), 0)
+
+    def test_weirdness_sms(self):
+        # Unknown number
+        response = self.client.post(url_for('weirdness.sms'), data={'Body': 'hi'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Go to https://calls.bmir.org/ to sign up for BMIR Phone Experiment.',
+                      response.data)
+
+        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14164390000'
+
+        # Message for non-enrolled number
+        response = self.client.post(url_for('weirdness.sms'),
+                                    data={'Body': 'hi', 'From': '4164390000'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'SIGN UP', response.data)
+        self.assertIn(b'to sign up', response.data)
+
+        # Sign up non-enrolled number
+        self.assertEqual(Volunteer.query.count(), 0)
+        response = self.client.post(url_for('weirdness.sms'),
+                                    data={'Body': 'siGn  uP', 'From': '4164390000'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'You have signed up', response.data)
+        self.assertIn(b'GO AWAY', response.data)
+        self.assertEqual(Volunteer.query.count(), 1)
+        volunteer = Volunteer.query.first()
+        self.assertEqual(volunteer.phone_number, '+14164390000')
+
+        # Text as enrolled number
+        response = self.client.post(url_for('weirdness.sms'),
+                                    data={'Body': 'hi', 'From': '4164390000'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Volunteer.query.count(), 1)
+        self.assertIn(b'GO AWAY', response.data)
+        self.assertIn(b'to stop receiving', response.data)
+
+        # Now unenroll
+        response = self.client.post(url_for('weirdness.sms'),
+                                    data={'Body': 'go AWAY', 'From': '4164390000'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Volunteer.query.count(), 0)
+        self.assertIn(b'You will no longer receive calls', response.data)
+        self.assertIn(b'SIGN UP', response.data)

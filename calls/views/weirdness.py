@@ -11,6 +11,7 @@ from calls.models import (
     db,
     Submission,
     Volunteer,
+    UserConfig,
 )
 from calls.utils import (
     get_gather_times,
@@ -22,24 +23,17 @@ from calls.utils import (
 )
 
 
-routing = Blueprint('routing', __name__, url_prefix='/routing')
+weirdness = Blueprint('weirdness', __name__, url_prefix='/weirdness')
 
 
-@routing.route('/outgoing', methods=('POST',))
+@weirdness.route('/outgoing', methods=('POST',))
 @protected
 def outgoing():
-    from_address = parse_sip_address(request.values.get('From'))
-    if from_address == app.config['BROADCAST_SIP_USERNAME']:
-        return outgoing_broadcast()
-    elif from_address == app.config['WEIRDNESS_SIP_USERNAME']:
-        return outgoing_weirdness()
-    else:
-        return render_xml('hang_up.xml', message='Invalid SIP address.')
+    # We can come from the broadcast outgoing route, where we may want to change
+    # behaviour
+    is_broadcast = parse_sip_address(
+        request.values.get('From')) == app.config['BROADCAST_SIP_USERNAME']
 
-
-@routing.route('/outgoing/weirdness', methods=('POST',))
-@protected
-def outgoing_weirdness():
     # If our submit action on the dialed call comes back with status completed,
     # that means the dialed party hung up. If this happens in the first 30 secs,
     # we'll dial someone else -- otherwise let's hang up on the caller
@@ -47,24 +41,29 @@ def outgoing_weirdness():
         request.values.get('DialCallStatus') == 'completed'
         and int(request.values.get('DialCallDuration', -1)) >= 30
     ):
-        return render_xml(
-            'hang_up.xml',
-            message=('Congratulations! You have won! You will receive a FREE '
-                     'Microsoft Zune in 3 to 5 business days.'),
-            music_url=app.config['WEIRDNESS_SIGNUP_MUSIC'])
-    else:
-        is_broadcast = parse_sip_address(
-            request.values.get('From')) == app.config['BROADCAST_SIP_USERNAME']
+        context = {}
+        if not is_broadcast:
+            context = {
+                'message': ('Congratulations! You have won! You will receive a FREE '
+                            'Microsoft Zune in 3 to 5 business days.'),
+                'music_url': app.config['WEIRDNESS_SIGNUP_MUSIC'],
+            }
 
+        return render_xml('hang_up.xml', **context)
+    else:
         # 1 in 30 chance we're calling the BMIR broadcast phone (unless this
         # call came routed from the broadcast desk)
-        if not is_broadcast and random.randint(1, 30) == 1:
+        if (
+            not is_broadcast
+            and random.randint(1, 30) == 1
+            and UserConfig.get('broadcast_incoming_enabled')
+        ):
             return render_xml(
                 'call.xml',
                 timeout=20,  # Sensible 20 timeout here
                 record=True,
                 from_number=app.config['WEIRDNESS_NUMBER'],
-                action_url=protected_external_url('routing.outgoing_weirdness'),
+                action_url=protected_external_url('weirdness.outgoing'),
                 to_sip_address='{}@{}'.format(
                     app.config['BROADCAST_SIP_USERNAME'],
                     app.config['TWILIO_SIP_DOMAIN'],
@@ -85,11 +84,11 @@ def outgoing_weirdness():
                 from_number=app.config['WEIRDNESS_NUMBER'],
                 to_number=volunteer.phone_number,
                 record=True,
-                action_url=protected_external_url('routing.outgoing_weirdness'),
-                whisper_url=protected_external_url('routing.whisper'))
+                action_url=protected_external_url('weirdness.outgoing'),
+                whisper_url=protected_external_url('weirdness.whisper'))
 
 
-@routing.route('/outgoing/whisper', methods=('POST',))
+@weirdness.route('/whisper', methods=('POST',))
 @protected
 def whisper():
     return render_xml(
@@ -97,42 +96,13 @@ def whisper():
         confirmed=bool(request.values.get('Digits')),
         has_gathered=bool(request.args.get('has_gathered')),
         action_url=protected_external_url(
-            'routing.whisper', has_gathered='y'),
+            'weirdness.whisper', has_gathered='y'),
     )
 
 
-def outgoing_broadcast():
-    to_number = parse_sip_address(request.values.get('To'))
-    if to_number == '#':
-        # Cheat code # calls the weirdness phone
-        return render_xml(
-            'call.xml',
-            record=True,
-            from_number=app.config['BROADCAST_NUMBER'],
-            to_sip_address='{}@{}'.format(
-                app.config['WEIRDNESS_SIP_USERNAME'],
-                app.config['TWILIO_SIP_DOMAIN'],
-            ))
-    elif to_number == '*':
-        # Cheat code * emulates a weirdness phone outgoing (calls a participant)
-        return outgoing_weirdness()
-    else:
-        to_number = sanitize_phone_number(to_number)
-        if to_number:
-            return render_xml(
-                'call.xml',
-                record=True,
-                to_number=to_number,
-                from_number=app.config['BROADCAST_NUMBER'])
-        else:
-            return render_xml('hang_up.xml', message=(
-                'Your call cannot be completed as dialed. Please eat some cabbage, bring '
-                'in your dry cleaning and try your call again. Good bye.'))
-
-
-@routing.route('/incoming/weirdness', methods=('POST',))
+@weirdness.route('/incoming', methods=('POST',))
 @protected
-def incoming_weirdness():
+def incoming():
     from_number = sanitize_phone_number(request.values.get('From'))
     if not from_number:
         return render_xml(
@@ -161,7 +131,7 @@ def incoming_weirdness():
             else:
                 confirm = True
                 url_kwargs['confirm'] = 'y'
-                del url_kwargs['gather_times']
+                del url_kwargs['gather']
         else:
             submission = Submission(phone_number=from_number)
             db.session.add(submission)
@@ -171,7 +141,7 @@ def incoming_weirdness():
 
     return render_xml(
         'incoming_weirdness.xml',
-        action_url=protected_external_url('routing.incoming_weirdness', **url_kwargs),
+        action_url=protected_external_url('weirdness.incoming', **url_kwargs),
         confirm=confirm,
         enrolled=enrolled,
         gather_times=gather_times,
@@ -179,10 +149,10 @@ def incoming_weirdness():
     )
 
 
-@routing.route('/incoming/weirdness/sms', methods=('POST',))
+@weirdness.route('/incoming/weirdness/sms', methods=('POST',))
 @protected
-def incoming_weirdness_sms():
-    from_number = sanitize_phone_number(request.values.get('From', ''))
+def sms():
+    from_number = sanitize_phone_number(request.values.get('From'))
     incoming_message = ' '.join(request.values.get('Body', '').lower().split())
 
     volunteer = Volunteer.query.filter_by(phone_number=from_number).first()
@@ -206,7 +176,7 @@ def incoming_weirdness_sms():
 
                 message = ('You have signed up for the BMIR Phone Experiment! '
                            'Text "GO AWAY" to stop receiving calls.',
-                           'NOTE: you could receive a calls 24 hours a day. To select '
+                           'NOTE: you could get a called 24 hours a day. To select '
                            'times of day to receive calls, go to https://calls.bmir.org/')
             else:
                 message = ('Text "SIGN UP" or go to to https://calls.bmir.org/ '
