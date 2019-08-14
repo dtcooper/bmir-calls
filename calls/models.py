@@ -140,7 +140,7 @@ class Volunteer(VolunteerBase, db.Model):
     __tablename__ = 'volunteers'
     submission_id = db.Column(db.Integer, nullable=False)
     updated = db.Column(db.DateTime(timezone=True), server_default=db.func.now(),
-                        server_onupdate=db.func.now())
+                        onupdate=db.func.now())
     last_called = db.Column(db.DateTime(timezone=True))
 
     __table_args__ = (
