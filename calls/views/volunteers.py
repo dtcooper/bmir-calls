@@ -12,6 +12,7 @@ from calls.models import (
 )
 from calls.utils import (
     get_gather_times,
+    external_url,
     protected,
     protected_external_url,
     render_xml,
@@ -79,7 +80,7 @@ def verify(id):
         phoned=bool(request.args.get('phoned')),
         confirmed=confirmed,
         gather_times=gather_times,
-        song_url=app.config['WEIRDNESS_SIGNUP_MUSIC'],
+        song_url=external_url('static', filename='troll.mp3', _external=True),
     )
 
 

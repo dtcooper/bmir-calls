@@ -14,6 +14,7 @@ from calls.models import (
     UserConfig,
 )
 from calls.utils import (
+    external_url,
     get_gather_times,
     parse_sip_address,
     protected,
@@ -46,7 +47,7 @@ def outgoing():
             context = {
                 'message': ('Congratulations! You have won! You will receive a FREE '
                             'Microsoft Zune in 3 to 5 business days.'),
-                'music_url': app.config['WEIRDNESS_SIGNUP_MUSIC'],
+                'music_url': external_url('static', filename='troll.mp3'),
             }
 
         return render_xml('hang_up.xml', **context)
@@ -77,7 +78,7 @@ def outgoing():
                 'hang_up.xml',
                 # TODO: better music + quotes
                 message='You lose. Thanks for playing! Better luck next time!',
-                music_url=app.config['WEIRDNESS_SIGNUP_MUSIC'])
+                music_url=external_url('static', filename='troll.mp3'))
         else:
             return render_xml(
                 'call.xml',
@@ -145,11 +146,11 @@ def incoming():
         confirm=confirm,
         enrolled=enrolled,
         gather_times=gather_times,
-        song_url=app.config['WEIRDNESS_SIGNUP_MUSIC'],
+        song_url=external_url('static', filename='troll.mp3'),
     )
 
 
-@weirdness.route('/incoming/weirdness/sms', methods=('POST',))
+@weirdness.route('/sms', methods=('POST',))
 @protected
 def sms():
     from_number = sanitize_phone_number(request.values.get('From'))

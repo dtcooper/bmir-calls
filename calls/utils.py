@@ -45,10 +45,14 @@ def render_xml(template, *args, **kwargs):
     return Response(render_template(template, *args, **kwargs), content_type='text/xml')
 
 
+def external_url(endpoint, *args, **kwargs):
+    kwargs['_external'] = True
+    return url_for(endpoint, *args, **kwargs)
+
+
 def protected_external_url(endpoint, *args, **kwargs):
-    defaults = {'_external': True, 'password': app.config['API_PASSWORD']}
-    defaults.update(kwargs)
-    return url_for(endpoint, *args, **defaults)
+    kwargs['password'] = app.config['API_PASSWORD']
+    return external_url(endpoint, *args, **kwargs)
 
 
 def parse_sip_address(address):
