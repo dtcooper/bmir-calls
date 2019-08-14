@@ -22,10 +22,10 @@ from calls.utils import (
 )
 
 
-call_routing = Blueprint('call_routing', __name__, url_prefix='/routing')
+routing = Blueprint('routing', __name__, url_prefix='/routing')
 
 
-@call_routing.route('/outgoing', methods=('POST',))
+@routing.route('/outgoing', methods=('POST',))
 @protected
 def outgoing():
     from_address = parse_sip_address(request.values.get('From'))
@@ -37,7 +37,7 @@ def outgoing():
         return render_xml('hang_up.xml', message='Invalid SIP address.')
 
 
-@call_routing.route('/outgoing/weirdness', methods=('POST',))
+@routing.route('/outgoing/weirdness', methods=('POST',))
 @protected
 def outgoing_weirdness():
     # If our submit action on the dialed call comes back with status completed,
@@ -64,7 +64,7 @@ def outgoing_weirdness():
                 timeout=20,  # Sensible 20 timeout here
                 record=True,
                 from_number=app.config['WEIRDNESS_NUMBER'],
-                action_url=protected_external_url('call_routing.outgoing_weirdness'),
+                action_url=protected_external_url('routing.outgoing_weirdness'),
                 to_sip_address='{}@{}'.format(
                     app.config['BROADCAST_SIP_USERNAME'],
                     app.config['TWILIO_SIP_DOMAIN'],
@@ -85,11 +85,11 @@ def outgoing_weirdness():
                 from_number=app.config['WEIRDNESS_NUMBER'],
                 to_number=volunteer.phone_number,
                 record=True,
-                action_url=protected_external_url('call_routing.outgoing_weirdness'),
-                whisper_url=protected_external_url('call_routing.whisper'))
+                action_url=protected_external_url('routing.outgoing_weirdness'),
+                whisper_url=protected_external_url('routing.whisper'))
 
 
-@call_routing.route('/outgoing/whisper', methods=('POST',))
+@routing.route('/outgoing/whisper', methods=('POST',))
 @protected
 def whisper():
     return render_xml(
@@ -97,7 +97,7 @@ def whisper():
         confirmed=bool(request.values.get('Digits')),
         has_gathered=bool(request.args.get('has_gathered')),
         action_url=protected_external_url(
-            'call_routing.whisper', has_gathered='y'),
+            'routing.whisper', has_gathered='y'),
     )
 
 
@@ -130,7 +130,7 @@ def outgoing_broadcast():
                 'in your dry cleaning and try your call again. Good bye.'))
 
 
-@call_routing.route('/incoming/weirdness', methods=('POST',))
+@routing.route('/incoming/weirdness', methods=('POST',))
 @protected
 def incoming_weirdness():
     from_number = sanitize_phone_number(request.values.get('From'))
@@ -171,7 +171,7 @@ def incoming_weirdness():
 
     return render_xml(
         'incoming_weirdness.xml',
-        action_url=protected_external_url('call_routing.incoming_weirdness', **url_kwargs),
+        action_url=protected_external_url('routing.incoming_weirdness', **url_kwargs),
         confirm=confirm,
         enrolled=enrolled,
         gather_times=gather_times,
@@ -179,7 +179,7 @@ def incoming_weirdness():
     )
 
 
-@call_routing.route('/incoming/weirdness/sms', methods=('POST',))
+@routing.route('/incoming/weirdness/sms', methods=('POST',))
 @protected
 def incoming_weirdness_sms():
     from_number = sanitize_phone_number(request.values.get('From', ''))

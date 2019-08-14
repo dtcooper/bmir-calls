@@ -222,8 +222,8 @@ class BMIRCallsTests(unittest.TestCase):
             ('volunteers.verify', 'get', {'id': 1}),
             ('volunteers.verify', 'post', {'id': 1}),
             ('volunteers.json', 'get', {}),
-            ('call_routing.outgoing', 'post', {}),
-            ('call_routing.incoming_weirdness', 'post', {}),
+            ('routing.outgoing', 'post', {}),
+            ('routing.incoming_weirdness', 'post', {}),
         )
 
         try:
@@ -240,13 +240,13 @@ class BMIRCallsTests(unittest.TestCase):
             app.config['API_PASSWORD'] = ''
 
     def test_whisper(self):
-        response = self.client.post(url_for('call_routing.whisper'))
+        response = self.client.post(url_for('routing.whisper'))
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'You are receiving a call', response.data)
 
     def test_outgoing_unknown_sip_addr(self):
         response = self.client.post(
-            url_for('call_routing.outgoing'),
+            url_for('routing.outgoing'),
             data={'From': 'sip:unknown@domain'},
         )
         self.assertEqual(response.status_code, 200)
@@ -257,20 +257,20 @@ class BMIRCallsTests(unittest.TestCase):
         # Try #1 + #2: Invalid number
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = None
         response = self.client.post(
-            url_for('call_routing.outgoing'),
+            url_for('routing.outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:0114169671111@domain'},
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Your call cannot be completed as dialed.', response.data)
         response = self.client.post(
-            url_for('call_routing.outgoing'), data={'From': 'sip:broadcast@domain'})
+            url_for('routing.outgoing'), data={'From': 'sip:broadcast@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Your call cannot be completed as dialed.', response.data)
 
         # Try #3: Outgoing number
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14169671111'
         response = self.client.post(
-            url_for('call_routing.outgoing'),
+            url_for('routing.outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:0014169671111@domain'},
         )
         self.assertEqual(response.status_code, 200)
@@ -278,7 +278,7 @@ class BMIRCallsTests(unittest.TestCase):
 
         # Try #4: # cheat code
         response = self.client.post(
-            url_for('call_routing.outgoing'),
+            url_for('routing.outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:%23@domain'},
         )
         self.assertEqual(response.status_code, 200)
@@ -287,7 +287,7 @@ class BMIRCallsTests(unittest.TestCase):
         # Try #5: * cheat code, routes to volunteer
         self.create_volunteer()
         response = self.client.post(
-            url_for('call_routing.outgoing'),
+            url_for('routing.outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:%2A@domain'},
         )
         self.assertEqual(response.status_code, 200)
@@ -302,7 +302,7 @@ class BMIRCallsTests(unittest.TestCase):
 
         # Try #1: No volunteers
         response = self.client.post(
-            url_for('call_routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+            url_for('routing.outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Thanks for playing!', response.data)
 
@@ -310,14 +310,14 @@ class BMIRCallsTests(unittest.TestCase):
         volunteer = self.create_volunteer()
         self.assertIsNone(volunteer.last_called)
         response = self.client.post(
-            url_for('call_routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+            url_for('routing.outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'+14169671111', response.data)
         self.assertIsNotNone(volunteer.last_called)
 
         # Try 3: Hung up on, 30s after a call
         response = self.client.post(
-            url_for('call_routing.outgoing'),
+            url_for('routing.outgoing'),
             data={'From': 'sip:weirdness@domain', 'DialCallStatus': 'completed',
                   'DialCallDuration': '60'})
         self.assertEqual(response.status_code, 200)
@@ -326,6 +326,6 @@ class BMIRCallsTests(unittest.TestCase):
         # Try 4: Randomly calls broadcast phone
         randint.return_value = 1
         response = self.client.post(
-            url_for('call_routing.outgoing'), data={'From': 'sip:weirdness@domain'})
+            url_for('routing.outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'broadcast@domain', response.data)
