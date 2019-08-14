@@ -162,7 +162,7 @@ class Volunteer(VolunteerBase, db.Model):
         volunteers = cls.query.filter(
             # Finds a currently opted in volunteer, and performs on the gin index :)
             cls.opt_in_hours.contains(current_hour_smallint_array),
-        ).order_by(nullsfirst(cls.last_called), cls.id).limit(
+        ).order_by(nullsfirst(cls.last_called)).limit(
             cls.RANDOM_POOL_SIZE).all()
 
         if not volunteers:
