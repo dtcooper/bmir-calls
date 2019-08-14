@@ -33,10 +33,6 @@ class VolunteerBase:
                 if value:
                     data[column.name] = str(value.astimezone(app.config['SERVER_TZ']))
 
-        data['opt_in_hours'] = [
-            '{0:02d}:00:00-{0:02d}:59:59'.format(time)
-            for time in self.opt_in_hours]
-
         return data
 
     @db.validates('phone_number')
