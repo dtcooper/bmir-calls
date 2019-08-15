@@ -34,6 +34,7 @@ class BMIRCallsTests(unittest.TestCase):
             'BROADCAST_SIP_USERNAME': 'broadcast',
             'TWILIO_SIP_DOMAIN': 'domain',
             'WEIRDNESS_SIP_USERNAME': 'weirdness',
+            'WEIRDNESS_SIP_ALT_USERNAMES': {'weirdness-alt1', 'weirdness-alt2'}
         })
 
         self.context = app.app_context()
@@ -252,7 +253,7 @@ class BMIRCallsTests(unittest.TestCase):
     def test_weirdness_whisper(self):
         response = self.client.post(url_for('weirdness.whisper'))
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'You are receiving a call', response.data)
+        self.assertIn(b'Incoming call', response.data)
 
     def test_outgoing_unknown_sip_addr(self):
         response = self.client.post(
@@ -331,19 +332,19 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertIn(b'+14169671111', response.data)
         self.assertIsNotNone(volunteer.last_called)
 
-        # Hung up on, 30s after a call
+        # Hung up on, 30s after a call (alternate phone)
         response = self.client.post(
             url_for('outgoing'),
-            data={'From': 'sip:weirdness@domain', 'DialCallStatus': 'completed',
-                  'DialCallDuration': '60'})
+            data={'From': 'sip:weirdness-alt1@domain',
+                  'DialCallStatus': 'completed', 'DialCallDuration': '60'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Microsoft Zune', response.data)
 
-        # Randomly calls broadcast phone
+        # Randomly calls broadcast phone (other alternate)
         randint.return_value = 1
         UserConfig.set('broadcast_incoming_enabled', True)
         response = self.client.post(
-            url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
+            url_for('outgoing'), data={'From': 'sip:weirdness-alt2@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'broadcast@domain', response.data)
 

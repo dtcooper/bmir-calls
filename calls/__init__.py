@@ -84,7 +84,10 @@ def outgoing():
     from_address = parse_sip_address(request.values.get('From'))
     if from_address == app.config['BROADCAST_SIP_USERNAME']:
         return outgoing_broadcast()
-    elif from_address == app.config['WEIRDNESS_SIP_USERNAME']:
+    elif (
+        from_address == app.config['WEIRDNESS_SIP_USERNAME']
+        or from_address in app.config['WEIRDNESS_SIP_ALT_USERNAMES']
+    ):
         return outgoing_weirdness()
     else:
         return render_xml('hang_up.xml', message='Invalid SIP address.')
