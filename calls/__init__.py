@@ -11,13 +11,13 @@ from flask import (
     url_for,
 )
 
+from calls import commands
 from calls.models import db
 from calls.utils import (
     parse_sip_address,
     protected,
     render_xml,
 )
-
 from calls.views import (
     broadcast,
     outgoing_broadcast,
@@ -39,7 +39,7 @@ if os.path.exists(site_config_path):
 
 # Register extensions
 db.init_app(app)
-
+commands.register_commands(app)
 
 # Set up Twilio client globally on app
 app.twilio = TwilioClient(
@@ -91,43 +91,3 @@ def outgoing():
         return outgoing_weirdness()
     else:
         return render_xml('hang_up.xml', message='Invalid SIP address.')
-
-
-@app.cli.add_command
-@app.cli.command('init-db', help='Initialize the DB.')
-def init_db():
-    with app.app_context():
-        if app.config['ENV'] != 'development':
-            confirm = input('Your flask environment is {}. Are you sure '
-                            '(y/n)? '.format(app.config['ENV']))
-            if not confirm.strip().lower().startswith('y'):
-                print('Aborting.')
-                return
-
-        db.drop_all()
-        db.create_all()
-        db.session.commit()
-
-
-@app.shell_context_processor
-def extra_shell_variables():
-    from calls.models import Submission, UserConfig, Volunteer
-    from calls.utils import sanitize_phone_number
-    return {'db': db, 'Submission': Submission, 'UserConfig': UserConfig,
-            'Volunteer': Volunteer, 'sanitize_phone_number': sanitize_phone_number}
-
-
-if app.debug and os.environ.get('PRINT_REQUESTS'):  # skip coverage
-    import pprint
-
-    @app.before_request
-    def before():
-        print(request.headers)
-        pprint.pprint(request.values)
-
-    @app.after_request
-    def after(response):
-        print(response.status)
-        print(response.headers)
-        print(response.get_data().decode('utf-8'))
-        return response

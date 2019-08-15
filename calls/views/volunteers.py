@@ -1,3 +1,5 @@
+from twilio.base.exceptions import TwilioRestException
+
 from flask import (
     Blueprint,
     current_app as app,
@@ -39,11 +41,14 @@ def submit():
             db.session.add(volunteer)
             db.session.commit()
 
-            app.twilio.messages.create(
-                body='Thanks for updating your BMIR Phone Experiment submission.',
-                from_=app.config['WEIRDNESS_NUMBER'],
-                to=submission.phone_number,
-            )
+            try:
+                app.twilio.messages.create(
+                    body='Thanks for updating your BMIR Phone Experiment submission.',
+                    from_=app.config['WEIRDNESS_NUMBER'],
+                    to=submission.phone_number,
+                )
+            except TwilioRestException:  # skip coverage
+                pass
 
         else:
             app.twilio.calls.create(
