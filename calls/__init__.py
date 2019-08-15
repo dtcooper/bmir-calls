@@ -1,4 +1,5 @@
 import os
+import random
 
 from twilio.rest import Client as TwilioClient
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -7,6 +8,7 @@ from flask import (
     Flask,
     redirect,
     request,
+    url_for,
 )
 
 from calls.models import db
@@ -27,10 +29,11 @@ from calls.views import (
 
 # Set up Flask app
 app = Flask(__name__)
+BASE_DIR = os.path.dirname(__file__)
 
 # Load config files
-app.config.from_pyfile(os.path.join(os.path.dirname(__file__), 'base_config.py'))
-site_config_path = os.path.join(os.path.dirname(__file__), '..', 'config.py')
+app.config.from_pyfile(os.path.join(BASE_DIR, 'base_config.py'))
+site_config_path = os.path.join(BASE_DIR, '..', 'config.py')
 if os.path.exists(site_config_path):
     app.config.from_pyfile(site_config_path)
 
@@ -69,6 +72,15 @@ def init_db():
         db.drop_all()
         db.create_all()
         db.session.commit()
+
+
+SONGS = os.listdir(os.path.join(BASE_DIR, 'static', 'songs'))
+
+
+@app.context_processor
+def extra_template_context():
+    return {'song_url': url_for(
+        'static', filename='songs/{}'.format(random.choice(SONGS)), _external=True)}
 
 
 @app.route('/health')

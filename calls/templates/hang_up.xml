@@ -6,8 +6,8 @@
         {% if message %}
             <Say>{{ message }}</Say>
         {% endif %}
-        {% if music_url %}
-            <Play>{{ music_url }}</Play>
+        {% if with_song %}
+            <Play>{{ song_url }}</Play>
         {% endif %}
         <Hangup />
     {% endif %}

@@ -14,7 +14,6 @@ from calls.models import (
     UserConfig,
 )
 from calls.utils import (
-    external_url,
     get_gather_times,
     parse_sip_address,
     protected,
@@ -47,7 +46,7 @@ def outgoing():
             context = {
                 'message': ('Congratulations! You have won! You will receive a FREE '
                             'Microsoft Zune in 3 to 5 business days.'),
-                'music_url': external_url('static', filename='troll.mp3'),
+                'with_song': True,
             }
 
         return render_xml('hang_up.xml', **context)
@@ -76,9 +75,9 @@ def outgoing():
         if not volunteer:
             return render_xml(
                 'hang_up.xml',
-                # TODO: better music + quotes
                 message='You lose. Thanks for playing! Better luck next time!',
-                music_url=external_url('static', filename='troll.mp3'))
+                with_song=True,
+            )
         else:
             return render_xml(
                 'call.xml',
@@ -86,7 +85,8 @@ def outgoing():
                 to_number=volunteer.phone_number,
                 record=True,
                 action_url=protected_external_url('weirdness.outgoing'),
-                whisper_url=protected_external_url('weirdness.whisper'))
+                whisper_url=protected_external_url('weirdness.whisper'),
+            )
 
 
 @weirdness.route('/whisper', methods=('POST',))
@@ -146,7 +146,6 @@ def incoming():
         confirm=confirm,
         enrolled=enrolled,
         gather_times=gather_times,
-        song_url=external_url('static', filename='troll.mp3'),
     )
 
 

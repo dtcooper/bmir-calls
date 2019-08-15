@@ -212,6 +212,9 @@ class BMIRCallsTests(unittest.TestCase):
     def test_public_urls(self):
         response = self.client.get(url_for('health'))
         self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            b'There are forty people in this world, and five of them are hamburgers.',
+            response.data)
 
         response = self.client.get(url_for('form_redirect'))
         self.assertEqual(response.status_code, 302)
