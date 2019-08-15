@@ -10,12 +10,13 @@
         <Hangup />
     {% else %}
         <Gather timeout="3" numDigits="1" finishOnKey="" actionOnEmptyResult="true" action="{{ action_url }}">
+            {# Announce three times and hang up #}
             {% for _ in range(3) %}
                 <Say>
                     Incoming call from Black Rock City, press any key to accept.
                 </Say>
                 {% if not loop.last %}
-                    <Pause length="2" />
+                    <Pause length="1" />
                 {% endif %}
             {% endfor %}
         </Gather>

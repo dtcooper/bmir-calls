@@ -60,7 +60,7 @@ def outgoing():
         ):
             return render_xml(
                 'call.xml',
-                timeout=20,  # Sensible 20 timeout here
+                timeout=20,
                 record=True,
                 from_number=app.config['WEIRDNESS_NUMBER'],
                 action_url=protected_external_url('weirdness.outgoing'),
@@ -81,9 +81,10 @@ def outgoing():
         else:
             return render_xml(
                 'call.xml',
+                record=True,
+                timeout=25,
                 from_number=app.config['WEIRDNESS_NUMBER'],
                 to_number=volunteer.phone_number,
-                record=True,
                 action_url=protected_external_url('weirdness.outgoing'),
                 whisper_url=protected_external_url('weirdness.whisper'),
             )

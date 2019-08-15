@@ -25,6 +25,7 @@ def outgoing():
         return render_xml(
             'call.xml',
             record=True,
+            timeout=40,
             from_number=app.config['BROADCAST_NUMBER'],
             to_sip_address='{}@{}'.format(
                 app.config['WEIRDNESS_SIP_USERNAME'],
