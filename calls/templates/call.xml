@@ -4,7 +4,7 @@
         ringTone="us"
         callerId="{{ from_number }}"
         timeout="{{ timeout|default(30) }}"
-        {% if record %}record="record-from-answer" trim="trim-silence"{% endif %}
+        {% if recording_enabled_globally and record %}record="record-from-answer" trim="trim-silence"{% endif %}
         {% if action_url %}action="{{ action_url }}"{% endif %}
     >
         {% if to_sip_address %}

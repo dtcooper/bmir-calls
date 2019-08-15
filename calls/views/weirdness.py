@@ -11,7 +11,7 @@ from calls.models import (
     db,
     Submission,
     Volunteer,
-    UserConfig,
+    UserCodeConfig,
 )
 from calls.utils import (
     get_gather_times,
@@ -55,8 +55,8 @@ def outgoing():
         # call came routed from the broadcast desk)
         if (
             not is_broadcast
-            and random.randint(1, 30) == 1
-            and UserConfig.get('broadcast_incoming_enabled')
+            and random.randint(1, app.config['WEIRDNESS_RANDOM_CHANCE_OF_BROADCAST']) == 1
+            and UserCodeConfig.get('random_weirdness_to_broadcast')
         ):
             return render_xml(
                 'call.xml',

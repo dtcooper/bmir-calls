@@ -8,7 +8,7 @@ from flask import request
 from calls.models import (
     db,
     Submission,
-    UserConfig,
+    UserCodeConfig,
     Volunteer,
 )
 from calls.utils import sanitize_phone_number
@@ -67,7 +67,7 @@ def register_commands(app):
 
     @app.shell_context_processor
     def extra_shell_variables():
-        return {'db': db, 'Submission': Submission, 'UserConfig': UserConfig,
+        return {'db': db, 'Submission': Submission, 'UserCodeConfig': UserCodeConfig,
                 'Volunteer': Volunteer, 'sanitize_phone_number': sanitize_phone_number}
 
     if app.debug and os.environ.get('PRINT_REQUESTS'):  # skip coverage

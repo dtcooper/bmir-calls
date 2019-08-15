@@ -11,6 +11,7 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 TWILIO_ACCOUNT_SID = 'ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
 TWILIO_AUTH_TOKEN = 'hackme'
+RECORDING_ENABLED = True  # Save money during development
 
 SERVER_TZ = pytz.timezone('US/Pacific')
 # No known daylight savings changes in August, so let's pick a date during BM
@@ -26,3 +27,4 @@ WEIRDNESS_SIGNUP_GOOGLE_FORM_URL = 'http://example.com/'
 WEIRDNESS_NUMBER = '+15555551234'
 WEIRDNESS_SIP_USERNAME = 'weirdness'
 WEIRDNESS_SIP_ALT_USERNAMES = {'weirdness-alt1', 'weirdness-alt2'}
+WEIRDNESS_RANDOM_CHANCE_OF_BROADCAST = 50  # 1:N

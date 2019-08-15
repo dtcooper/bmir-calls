@@ -1,3 +1,4 @@
+from collections import namedtuple
 import datetime
 import random
 
@@ -177,29 +178,48 @@ class Volunteer(VolunteerBase, db.Model):
         return volunteer
 
 
-class UserConfig(db.Model):
-    __tablename__ = 'user_config'
-    DEFAULTS = {'broadcast_incoming_enabled': True}
+class UserCodeConfig(db.Model):
+    UserCode = namedtuple('UserCode', ('number', 'name', 'default', 'description'))
+    CODES = (
+        UserCode('0', 'random_weirdness_to_broadcast', True,
+                 'Outside phone randomly calling the broadcast desk'),
+        UserCode('1', 'broadcast_calls', True, 'Broadcast desk phone'),
+        UserCode('2', 'random_broadcast_misses_to_weirdness', False,
+                 'BMIR callers randomly calling the outside phone'),
+        UserCode('3', 'weirdness_multiring', False, 'Ringing multiple callers'),
+    )
+    CODES_BY_NUMBER = {code.number: code for code in CODES}
+    CODES_BY_NAME = {code.name: code for code in CODES}
 
-    key = db.Column(db.String(40), primary_key=True)
-    value = db.Column(postgresql.JSONB())
+    __tablename__ = 'user_code_config'
+
+    name = db.Column(db.String(40), primary_key=True)
+    value = db.Column(db.Boolean(), nullable=False)
 
     @classmethod
-    def get(cls, key):
-        config = cls.query.filter_by(key=key).first()
-        return config.value if config else cls.DEFAULTS.get(key)
+    def get_code_by_number(cls, number):
+        return cls.CODES_BY_NUMBER.get(number)
 
     @classmethod
-    def set(cls, key, value):
-        config = cls.query.filter_by(key=key).first()
+    def get(cls, name):
+        code = cls.CODES_BY_NAME.get(name)
+        if not code:
+            return None
+        config = cls.query.filter_by(name=code.name).first()
+        return config.value if config else code.default
 
-        if config:
-            config.value = value
-        else:
-            config = cls(key=key, value=value)
+    @classmethod
+    def set(cls, name, value):
+        code = cls.CODES_BY_NAME.get(name)
+        if code:
+            config = cls.query.filter_by(name=code.name).first()
 
-        db.session.add(config)
-        db.session.commit()
+            if config:
+                config.value = value
+            else:
+                config = cls(name=code.name, value=value)
+            db.session.add(config)
+            db.session.commit()
 
     def __repr__(self):
-        return '<UserConfig {}={!r}>'.format(self.key, self.value)
+        return '<UserCodeConfig {}={!r}>'.format(self.name, self.value)

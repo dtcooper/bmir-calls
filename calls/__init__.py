@@ -63,8 +63,11 @@ SONGS = os.listdir(os.path.join(BASE_DIR, 'static', 'songs'))
 
 @app.context_processor
 def extra_template_context():
-    return {'song_url': url_for(
-        'static', filename='songs/{}'.format(random.choice(SONGS)), _external=True)}
+    return {
+        'song_url': url_for('static', filename='songs/{}'.format(
+            random.choice(SONGS)), _external=True),
+        'recording_enabled_globally': app.config['RECORDING_ENABLED'],
+    }
 
 
 @app.route('/health')

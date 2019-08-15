@@ -11,7 +11,7 @@ from calls import app
 from calls.models import (
     db,
     Submission,
-    UserConfig,
+    UserCodeConfig,
     Volunteer,
 )
 
@@ -267,8 +267,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = None
         response = self.client.post(
             url_for('outgoing'),
-            data={'From': 'sip:broadcast@domain', 'To': 'sip:0114169671111@domain'},
-        )
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:0114169671111@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Your call cannot be completed as dialed.', response.data)
         response = self.client.post(
@@ -280,30 +279,49 @@ class BMIRCallsTests(unittest.TestCase):
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14169671111'
         response = self.client.post(
             url_for('outgoing'),
-            data={'From': 'sip:broadcast@domain', 'To': 'sip:0014169671111@domain'},
-        )
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:0014169671111@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'+14169671111', response.data)
 
-        # # cheat code
+        # ## (double pound) cheat code routes to weirdness phone outside
         response = self.client.post(
             url_for('outgoing'),
-            data={'From': 'sip:broadcast@domain', 'To': 'sip:%23@domain'},
-        )
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:%23%23@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'weirdness@domain', response.data)
 
-        # * cheat code, routes to volunteer
+        # * cheat code, routes to Volunteer
         self.create_volunteer()
         response = self.client.post(
             url_for('outgoing'),
-            data={'From': 'sip:broadcast@domain', 'To': 'sip:%2A@domain'},
-        )
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:*@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'+14169671111', response.data)
 
         # Since we're broadcast outgoing, no random shuffle here
         randint.assert_not_called()
+
+    def test_broadcast_user_code_config(self):
+        for code in UserCodeConfig.CODES:
+            # Toggle each code
+            for value in (code.default, not code.default):
+                self.assertEqual(UserCodeConfig.get(code.name), value)
+                response = self.client.post(
+                    url_for('outgoing'), data={'From': 'sip:broadcast@domain',
+                                               'To': 'sip:%23{}@domain'.format(code.number)})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('{} {}.'.format(
+                    code.description, 'disabled' if value else 'enabled').encode(),
+                    response.data)
+                self.assertEqual(UserCodeConfig.get(code.name), not value)
+
+        self.assertIsNone(UserCodeConfig.get('invalid_code_name'))
+        response = self.client.post(
+            url_for('outgoing'), data={'From': 'sip:broadcast@domain',
+                                       'To': 'sip:%239@domain'.format(code.number)})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Invalid code. Please try again.', response.data)
+        self.assertIsNone(UserCodeConfig.get('invalid_code_name'))
 
     def test_broadcast_incoming(self):
         response = self.client.post(url_for('broadcast.incoming'))
@@ -342,14 +360,14 @@ class BMIRCallsTests(unittest.TestCase):
 
         # Randomly calls broadcast phone (other alternate)
         randint.return_value = 1
-        UserConfig.set('broadcast_incoming_enabled', True)
+        UserCodeConfig.set('random_weirdness_to_broadcast', True)
         response = self.client.post(
             url_for('outgoing'), data={'From': 'sip:weirdness-alt2@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'broadcast@domain', response.data)
 
         # Unless broadcast phone is disabled
-        UserConfig.set('broadcast_incoming_enabled', False)
+        UserCodeConfig.set('random_weirdness_to_broadcast', False)
         response = self.client.post(
             url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)

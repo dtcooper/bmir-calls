@@ -5,6 +5,7 @@ from flask import (
     Response,
 )
 
+from calls.models import UserCodeConfig
 from calls.utils import (
     parse_sip_address,
     protected,
@@ -20,38 +21,51 @@ broadcast = Blueprint('broadcast', __name__, url_prefix='/broadcast')
 # Gets routed by app.outgoing
 def outgoing():
     to_number = parse_sip_address(request.values.get('To'))
-    if to_number == '#':
-        # Cheat code # calls the weirdness phone
-        return render_xml(
-            'call.xml',
-            record=True,
-            timeout=40,
-            from_number=app.config['BROADCAST_NUMBER'],
-            to_sip_address='{}@{}'.format(
-                app.config['WEIRDNESS_SIP_USERNAME'],
-                app.config['TWILIO_SIP_DOMAIN'],
-            ))
-    elif to_number == '*':
-        # Cheat code * emulates a weirdness phone outgoing (calls a participant)
-        return outgoing_weirdness()
-    else:
-        to_number = sanitize_phone_number(to_number)
-        if to_number:
+    if to_number:
+        if to_number == '*':
+            # Cheat code * emulates a weirdness phone outgoing (calls a participant)
+            return outgoing_weirdness()
+        elif to_number == '##':
+            # Cheat code ## calls the weirdness phone
             return render_xml(
                 'call.xml',
                 record=True,
-                to_number=to_number,
-                from_number=app.config['BROADCAST_NUMBER'])
+                timeout=40,
+                from_number=app.config['BROADCAST_NUMBER'],
+                to_sip_address='{}@{}'.format(
+                    app.config['WEIRDNESS_SIP_USERNAME'],
+                    app.config['TWILIO_SIP_DOMAIN'],
+                ))
+        if to_number.startswith('#'):
+            code = UserCodeConfig.get_code_by_number(to_number[1:])
+            if code:  # Flip code
+                value = UserCodeConfig.get(code.name)
+                UserCodeConfig.set(code.name, not value)
+
+                return render_xml('hang_up.xml', message='{} {}.'.format(
+                    code.description, 'disabled' if value else 'enabled'))
+            else:
+                return render_xml('hang_up.xml', message='Invalid code. Please try again.')
+
         else:
-            return render_xml('hang_up.xml', message=(
-                'Your call cannot be completed as dialed. Please eat some cabbage, bring '
-                'in your dry cleaning and try your call again. Good bye.'))
+            to_number = sanitize_phone_number(to_number)
+            if to_number:
+                return render_xml(
+                    'call.xml',
+                    record=True,
+                    to_number=to_number,
+                    from_number=app.config['BROADCAST_NUMBER'])
+
+    # Catch-all
+    return render_xml('hang_up.xml', message=(
+        'Your call cannot be completed as dialed. Please eat some cabbage, bring '
+        'in your dry cleaning and try your call again. Good bye.'))
 
 
 @broadcast.route('/incoming', methods=('POST',))
 @protected
 def incoming():
-    return Response(status=501)  # Unimplemented
+    return Response(status=501)
 
 
 @broadcast.route('/sms', methods=('POST',))
