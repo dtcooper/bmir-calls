@@ -58,22 +58,6 @@ if app.debug:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
 
-@app.cli.add_command
-@app.cli.command('init-db', help='Initialize the DB.')
-def init_db():
-    with app.app_context():
-        if app.config['ENV'] != 'development':
-            confirm = input('Your flask environment is {}. Are you sure '
-                            '(y/n)? '.format(app.config['ENV']))
-            if not confirm.strip().lower().startswith('y'):
-                print('Aborting.')
-                return
-
-        db.drop_all()
-        db.create_all()
-        db.session.commit()
-
-
 SONGS = os.listdir(os.path.join(BASE_DIR, 'static', 'songs'))
 
 
@@ -106,11 +90,36 @@ def outgoing():
         return render_xml('hang_up.xml', message='Invalid SIP address.')
 
 
+@app.cli.add_command
+@app.cli.command('init-db', help='Initialize the DB.')
+def init_db():
+    with app.app_context():
+        if app.config['ENV'] != 'development':
+            confirm = input('Your flask environment is {}. Are you sure '
+                            '(y/n)? '.format(app.config['ENV']))
+            if not confirm.strip().lower().startswith('y'):
+                print('Aborting.')
+                return
+
+        db.drop_all()
+        db.create_all()
+        db.session.commit()
+
+
+@app.shell_context_processor
+def extra_shell_variables():
+    from calls.models import Submission, UserConfig, Volunteer
+    from calls.utils import sanitize_phone_number
+    return {'db': db, 'Submission': Submission, 'UserConfig': UserConfig,
+            'Volunteer': Volunteer, 'sanitize_phone_number': sanitize_phone_number}
+
+
 if app.debug and os.environ.get('PRINT_REQUESTS'):  # skip coverage
+    import pprint
+
     @app.before_request
     def before():
         print(request.headers)
-        import pprint
         pprint.pprint(request.values)
 
     @app.after_request

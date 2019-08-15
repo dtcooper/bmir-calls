@@ -151,8 +151,10 @@ class Volunteer(VolunteerBase, db.Model):
     )
 
     @classmethod
-    def get_random_opted_in(cls, update_last_called=True):
-        current_hour = datetime.datetime.now(app.config['SERVER_TZ']).hour
+    def get_random_opted_in(cls, update_last_called=True, current_hour=None):
+        if current_hour is None:
+            current_hour = datetime.datetime.now(app.config['SERVER_TZ']).hour
+
         current_hour_smallint_array = cast([current_hour], db.ARRAY(db.SmallInteger))
 
         # Take the N least recently called volunteers, and pick one at random

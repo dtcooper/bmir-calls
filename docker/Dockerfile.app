@@ -2,6 +2,14 @@ FROM python:3.6
 
 EXPOSE 5000
 
+# Add psql
+ENV PGHOST db
+ENV PGUSER postgres
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV FLASK_ENV development
 ENV FLASK_APP calls
 
