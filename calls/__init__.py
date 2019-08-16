@@ -35,7 +35,7 @@ BASE_DIR = os.path.dirname(__file__)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config.from_pyfile(os.path.join(BASE_DIR, 'base_config.py'))
 site_config_path = os.path.join(BASE_DIR, '..', 'config.py')
-if os.path.exists(site_config_path):
+if os.path.exists(site_config_path):  # skip coverage
     app.config.from_pyfile(site_config_path)
 
 # Register extensions
