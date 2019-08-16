@@ -59,6 +59,7 @@ class BMIRCallsTests(unittest.TestCase):
 
         mock_phone = '+1{}'.format(re.sub(r'[^0-9]', '', json_data['phone_number']))
         self.twilio_mock.lookups.phone_numbers().fetch().phone_number = mock_phone
+        self.twilio_mock.lookups.phone_numbers().fetch().country_code = 'US'
 
         return json_data
 
@@ -69,6 +70,7 @@ class BMIRCallsTests(unittest.TestCase):
             'phone_number': '+14169671111',
             'opt_in_hours': list(range(24)),
             'valid_phone': True,
+            'country_code': 'US',
         }
         defaults.update(kwargs)
         submission = Submission(**defaults)
@@ -82,7 +84,7 @@ class BMIRCallsTests(unittest.TestCase):
             submission = cls.create_submission()
         return submission.create_volunteer()
 
-    def test_form_submit(self):
+    def test_volunteer_form_submit(self):
         self.assertEqual(Submission.query.count(), 0)
         self.assertEqual(Volunteer.query.count(), 0)
 
@@ -98,8 +100,8 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(submission.opt_in_hours, list(range(24)))
         self.assertEqual(
             submission.timezone,
-            '[GMT-07:00] Pacific Time // Black Rock City Time (US/Pacific)',
-        )
+            '[GMT-07:00] Pacific Time // Black Rock City Time (US/Pacific)')
+        self.assertEqual(submission.country_code, 'US')
         self.assertTrue(submission.valid_phone)
         self.assertEqual(self.twilio_mock.calls.create.call_count, 1)
 
@@ -120,7 +122,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(self.twilio_mock.messages.create.call_count, 0)
 
         # Invalid phone number, nothing happens
-        with patch('calls.models.sanitize_phone_number', lambda _: False):
+        with patch('calls.models.sanitize_phone_number', lambda *_, **__: (None, None)):
             response = self.client.post(
                 url_for('volunteers.submit'),
                 json=self.get_submit_json(phone_number='hi mom!'))
@@ -182,6 +184,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(submission.id, volunteer.submission_id)
         self.assertEqual(submission.phone_number, volunteer.phone_number)
         self.assertEqual(submission.opt_in_hours, volunteer.opt_in_hours)
+        self.assertEqual(submission.country_code, volunteer.country_code)
 
         # Try to verify a submission with the same phone number fails
         submission_dupe = self.create_submission()

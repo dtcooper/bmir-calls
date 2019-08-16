@@ -13,7 +13,9 @@ from flask import (
 )
 
 
-def sanitize_phone_number(phone_number):
+def sanitize_phone_number(phone_number, with_country_code=False):
+    sanitized = (None, None) if with_country_code else None
+
     if isinstance(phone_number, str):
         # Replace double zero with plus, because I'm used to that shit!
         for intl_prefix in ('00', '011'):
@@ -21,13 +23,18 @@ def sanitize_phone_number(phone_number):
                 phone_number = '+' + phone_number[len(intl_prefix):]
 
         try:
-            return app.twilio.lookups.phone_numbers(
-                phone_number).fetch(country_code='US').phone_number
+            lookup = app.twilio.lookups.phone_numbers(
+                phone_number).fetch(country_code='US')
         except TwilioRestException:  # skip coverage
             app.logger.warn('Invalid phone number: {}'.format(phone_number))
             pass
+        else:
+            if with_country_code:
+                sanitized = (lookup.phone_number, lookup.country_code)
+            else:
+                sanitized = lookup.phone_number
 
-    return None
+    return sanitized
 
 
 def protected(route):

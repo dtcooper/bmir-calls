@@ -23,6 +23,7 @@ class VolunteerBase:
     created = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     phone_number = db.Column(db.String(20), nullable=False)
     opt_in_hours = db.Column(postgresql.ARRAY(db.SmallInteger, dimensions=1), nullable=False, default=list(range(24)))
+    country_code = db.Column(db.String(2), nullable=False, default='??')
 
     def serialize(self):
         data = {col.name: getattr(self, col.name) for col in self.__table__.columns}
@@ -36,7 +37,7 @@ class VolunteerBase:
 
         return data
 
-    @db.validates('phone_number')
+    @db.validates('country_code', 'phone_number', 'timezone')
     def validate_code(self, key, value):
         max_len = getattr(self.__class__, key).prop.columns[0].type.length
         if value and len(value) > max_len:
@@ -108,11 +109,13 @@ class Submission(VolunteerBase, db.Model):
             'valid_phone': False,
         })
 
-        phone_number = sanitize_phone_number(kwargs['phone_number'])
+        phone_number, country_code = sanitize_phone_number(
+            kwargs['phone_number'], with_country_code=True)
         if phone_number:
             kwargs.update({
                 'phone_number': phone_number,
                 'valid_phone': True,
+                'country_code': country_code,
             })
 
         submission = cls(**kwargs)
