@@ -183,7 +183,7 @@ class UserCodeConfig(db.Model):
     CODES = (
         UserCode('0', 'random_weirdness_to_broadcast', True,
                  'Outside phone randomly calling the broadcast desk'),
-        UserCode('1', 'broadcast_calls', True, 'Broadcast desk phone'),
+        UserCode('1', 'broadcast_incoming', True, 'Broadcast desk phone ringer'),
         UserCode('2', 'random_broadcast_misses_to_weirdness', False,
                  'BMIR callers randomly calling the outside phone'),
         UserCode('3', 'weirdness_multiring', False, 'Ringing multiple callers'),

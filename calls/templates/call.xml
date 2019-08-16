@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Dial
-        ringTone="us"
+        answerOnBridge="true"
+        ringTone="us-old"
         callerId="{{ from_number }}"
         timeout="{{ timeout|default(30) }}"
         {% if recording_enabled_globally and record %}record="record-from-answer" trim="trim-silence"{% endif %}

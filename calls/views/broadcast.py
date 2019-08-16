@@ -9,6 +9,7 @@ from calls.models import UserCodeConfig
 from calls.utils import (
     parse_sip_address,
     protected,
+    protected_external_url,
     render_xml,
     sanitize_phone_number,
 )
@@ -42,8 +43,10 @@ def outgoing():
                 value = UserCodeConfig.get(code.name)
                 UserCodeConfig.set(code.name, not value)
 
-                return render_xml('hang_up.xml', message='{} {}.'.format(
-                    code.description, 'disabled' if value else 'enabled'))
+                message = ('{} is now {}. '.format(
+                    code.description, 'disabled' if value else 'enabled') * 2).strip()
+                return render_xml('hang_up.xml', message=message, pause=1)
+
             else:
                 return render_xml('hang_up.xml', message='Invalid code. Please try again.')
 
@@ -54,7 +57,8 @@ def outgoing():
                     'call.xml',
                     record=True,
                     to_number=to_number,
-                    from_number=app.config['BROADCAST_NUMBER'])
+                    from_number=app.config['BROADCAST_NUMBER'],
+                )
 
     # Catch-all
     return render_xml('hang_up.xml', message=(
@@ -65,7 +69,28 @@ def outgoing():
 @broadcast.route('/incoming', methods=('POST',))
 @protected
 def incoming():
-    return Response(status=501)
+    call_status = request.values.get('DialCallStatus')
+
+    if call_status == 'completed':
+        return render_xml('hang_up.xml', with_song=True)
+
+    elif (
+        call_status in ('busy', 'no-answer', 'failed')
+        or not UserCodeConfig.get('broadcast_incoming')
+    ):
+        return render_xml('voicemail.xml')
+
+    else:
+        return render_xml(
+            'call.xml',
+            record=True,
+            action_url=protected_external_url('broadcast.incoming'),
+            from_number=app.config['BROADCAST_NUMBER'],
+            to_sip_address='{}@{}'.format(
+                app.config['BROADCAST_SIP_USERNAME'],
+                app.config['TWILIO_SIP_DOMAIN']
+            ),
+        )
 
 
 @broadcast.route('/sms', methods=('POST',))

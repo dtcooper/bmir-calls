@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    {% if not message and not music_url %}
+    {% if not message and not with_song %}
         <Reject />
     {% else %}
         {% if message %}
@@ -8,6 +8,9 @@
         {% endif %}
         {% if with_song %}
             <Play>{{ song_url }}</Play>
+        {% endif %}
+        {% if pause %}
+            <Pause length="{{ pause }}" />
         {% endif %}
         <Hangup />
     {% endif %}

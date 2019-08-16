@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say>
+        Welcome to R M I B, 54 dot 9 AM.
+        No one is available to call your take right now.
+        Please beep until the message to leave your wait.
+        Message, beep, please, beep, message.
+        Metamorphosized? Meteorologist? Metamorphosis? Have I metamorphosed?
+        I don't know? Have you? I can't remember.
+        Things have changed since we last spoke. We've never spoke.
+        Message.
+    </Say>
+
+    {# TODO better action handling here #}
+    <Record maxLength="300" trim="trim-silence" action="https://twimlets.com/echo?Twiml=%3CResponse%3E%3CHangup%20%2F%3E%3C%2FResponse%3E" />
+</Response>

@@ -3,7 +3,7 @@
     {% if confirmed %}
         <Say>
             <prosody rate="x-fast">
-                Your call may be monitored or recorded for comedic purposes.
+                Your call may be monitored or recorded for hilarious purposes. Beep.
             </prosody>
         </Say>
     {% elif has_gathered %}

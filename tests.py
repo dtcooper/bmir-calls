@@ -310,7 +310,7 @@ class BMIRCallsTests(unittest.TestCase):
                     url_for('outgoing'), data={'From': 'sip:broadcast@domain',
                                                'To': 'sip:%23{}@domain'.format(code.number)})
                 self.assertEqual(response.status_code, 200)
-                self.assertIn('{} {}.'.format(
+                self.assertIn('{} is now {}.'.format(
                     code.description, 'disabled' if value else 'enabled').encode(),
                     response.data)
                 self.assertEqual(UserCodeConfig.get(code.name), not value)
@@ -324,8 +324,29 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertIsNone(UserCodeConfig.get('invalid_code_name'))
 
     def test_broadcast_incoming(self):
+        # Test basic incoming
         response = self.client.post(url_for('broadcast.incoming'))
-        self.assertEqual(response.status_code, 501)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'broadcast@domain', response.data)
+
+        # Not answering / busy go to voice mail
+        for status in ('busy', 'no-answer', 'failed'):
+            response = self.client.post(url_for('broadcast.incoming'),
+                                        data={'DialCallStatus': status})
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'<Record', response.data)
+
+        # Call completed hangs up (trolls with jingle)
+        response = self.client.post(url_for('broadcast.incoming'),
+                                    data={'DialCallStatus': 'completed'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'<Play', response.data)
+
+        # Ringer turned off
+        UserCodeConfig.set('broadcast_incoming', False)
+        response = self.client.post(url_for('broadcast.incoming'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'<Record', response.data)
 
     def test_broadcast_sms(self):
         response = self.client.post(url_for('broadcast.sms'))
