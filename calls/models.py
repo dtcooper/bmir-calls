@@ -9,9 +9,9 @@ from sqlalchemy.sql.expression import (
 )
 import pytz
 
-from flask import current_app as app
 from flask_sqlalchemy import SQLAlchemy
 
+from calls import constants
 from calls.utils import sanitize_phone_number
 
 
@@ -33,7 +33,7 @@ class VolunteerBase:
             if isinstance(column.type, db.DateTime):
                 value = data[column.name]
                 if value:
-                    data[column.name] = str(value.astimezone(app.config['SERVER_TZ']))
+                    data[column.name] = str(value.astimezone(constants.SERVER_TZ))
 
         return data
 
@@ -72,7 +72,7 @@ class Submission(VolunteerBase, db.Model):
             for key, val in json_data.items()
         }
 
-        user_tz = app.config['SERVER_TZ']
+        user_tz = constants.SERVER_TZ
         try:
             user_tz_str = kwargs['timezone']
             if user_tz_str:
@@ -97,11 +97,10 @@ class Submission(VolunteerBase, db.Model):
             # Localize hour on conversion date to user's timezone, then convert
             # to server's timezone and take the hour
             hour = user_tz.localize(datetime.datetime.combine(
-                app.config['DATE_FOR_TZ_CONVERSION'],
-                datetime.time(hour=hour),
-            )).astimezone(app.config['SERVER_TZ']).hour
+                constants.DATE_FOR_TZ_CONVERSION, datetime.time(hour=hour),
+            )).astimezone(constants.SERVER_TZ).hour
 
-            for i in range(app.config['FORM_HOUR_CHUNK_SIZE']):
+            for i in range(constants.FORM_HOUR_CHUNK_SIZE):
                 opt_in_hours.append((hour + i) % 24)
 
         kwargs.update({
@@ -139,8 +138,6 @@ class Submission(VolunteerBase, db.Model):
 
 
 class Volunteer(VolunteerBase, db.Model):
-    RANDOM_POOL_SIZE = 5
-
     __tablename__ = 'volunteers'
     submission_id = db.Column(db.Integer, nullable=False)
     updated = db.Column(db.DateTime(timezone=True), server_default=db.func.now(),
@@ -148,48 +145,53 @@ class Volunteer(VolunteerBase, db.Model):
     last_called = db.Column(db.DateTime(timezone=True))
 
     __table_args__ = (
-        # XXX https://stackoverflow.com/a/37403848
         db.Index('volunteers_phone_number_key', 'phone_number', unique=True),
         db.Index('volunteers_last_called_key', last_called,
                  postgresql_ops={'last_called': 'ASC NULLS FIRST'})
     )
 
     @classmethod
-    def get_random_opted_in(cls, update_last_called=True, current_hour=None):
+    def get_random_opted_in(cls, update_last_called=True, current_hour=None, multiring=False):
         if current_hour is None:
-            current_hour = datetime.datetime.now(app.config['SERVER_TZ']).hour
+            current_hour = datetime.datetime.now(constants.SERVER_TZ).hour
 
-        current_hour_smallint_array = cast([current_hour], db.ARRAY(db.SmallInteger))
+        limit = constants.VOLUNTEER_RANDOM_POOL_SIZE
+        if multiring:
+            limit = limit * constants.MULTIRING_COUNT
 
         # Take the N least recently called volunteers, and pick one at random
         volunteers = cls.query.filter(
             # Finds a currently opted in volunteer, and performs on the gin index :)
-            cls.opt_in_hours.contains(current_hour_smallint_array),
-        ).order_by(nullsfirst(cls.last_called)).limit(
-            cls.RANDOM_POOL_SIZE).all()
+            cls.opt_in_hours.contains(cast([current_hour], db.ARRAY(db.SmallInteger))),
+        ).order_by(nullsfirst(cls.last_called)).limit(limit).all()
 
         if not volunteers:
-            return None
+            return []
 
-        volunteer = random.choice(volunteers)
+        volunteers = random.sample(volunteers, constants.MULTIRING_COUNT if multiring else 1)
 
         if update_last_called:
-            volunteer.last_called = datetime.datetime.now(app.config['SERVER_TZ'])
-            db.session.add(volunteer)
-            db.session.commit()
+            now = datetime.datetime.now(constants.SERVER_TZ)
+            for volunteer in volunteers:
+                volunteer.last_called = now
+                db.session.add(volunteer)
+                db.session.commit()
 
-        return volunteer
+        return volunteers
 
 
 class UserCodeConfig(db.Model):
     UserCode = namedtuple('UserCode', ('number', 'name', 'default', 'description'))
+    BROADCAST_TO_WEIRDNESS_CODE = '1'
     CODES = (
-        UserCode('0', 'random_weirdness_to_broadcast', True,
-                 'Outside phone randomly calling the broadcast desk'),
-        UserCode('1', 'broadcast_incoming', True, 'Broadcast desk phone ringer'),
-        UserCode('2', 'random_broadcast_misses_to_weirdness', False,
+        UserCode('#', 'broadcast_enable_incoming', True,
+                 'Broadcast desk phone ringer'),
+        UserCode('77', 'random_broadcast_misses_to_weirdness', True,
                  'BMIR callers randomly calling the outside phone'),
-        UserCode('3', 'weirdness_multiring', False, 'Ringing multiple callers'),
+        UserCode('88', 'random_weirdness_to_broadcast', False,
+                 'Outside phone randomly calling the broadcast desk'),
+        UserCode('99', 'weirdness_multiring', False,
+                 'Outside phone ringing multiple people simultaneously'),
     )
     CODES_BY_NUMBER = {code.number: code for code in CODES}
     CODES_BY_NAME = {code.name: code for code in CODES}

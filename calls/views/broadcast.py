@@ -1,3 +1,5 @@
+import random
+
 from flask import (
     Blueprint,
     current_app as app,
@@ -5,6 +7,7 @@ from flask import (
     Response,
 )
 
+from calls import constants
 from calls.models import UserCodeConfig
 from calls.utils import (
     parse_sip_address,
@@ -26,8 +29,8 @@ def outgoing():
         if to_number == '*':
             # Cheat code * emulates a weirdness phone outgoing (calls a participant)
             return outgoing_weirdness()
-        elif to_number == '##':
-            # Cheat code ## calls the weirdness phone
+        elif to_number == '#{}'.format(UserCodeConfig.BROADCAST_TO_WEIRDNESS_CODE):
+            # Cheat code ## calls the weirdness phone incoming (calls outdoor phone)
             return render_xml(
                 'call.xml',
                 record=True,
@@ -76,9 +79,15 @@ def incoming():
 
     elif (
         call_status in ('busy', 'no-answer', 'failed')
-        or not UserCodeConfig.get('broadcast_incoming')
+        or not UserCodeConfig.get('broadcast_enable_incoming')
     ):
-        return render_xml('voicemail.xml')
+        if (
+            random.randint(1, constants.INCOMING_CALLERS_RANDOM_CHANCE_OF_WEIRDNESS) == 1
+            and UserCodeConfig.get('random_broadcast_misses_to_weirdness')
+        ):
+            return outgoing_weirdness()
+        else:
+            return render_xml('voicemail.xml')
 
     else:
         return render_xml(

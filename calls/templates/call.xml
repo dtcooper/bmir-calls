@@ -11,7 +11,12 @@
         {% if to_sip_address %}
             <Sip>{{ to_sip_address }}</Sip>
         {% else %}
-            <Number {% if whisper_url %}url="{{ whisper_url }}"{% endif %}>{{ to_number }}</Number>
+            {% if not to_numbers %}
+                {% set to_numbers = [to_number] %}
+            {% endif %}
+            {% for to_number in to_numbers %}
+                <Number {% if whisper_url %}url="{{ whisper_url }}"{% endif %}>{{ to_number }}</Number>
+            {% endfor %}
         {% endif %}
     </Dial>
 </Response>

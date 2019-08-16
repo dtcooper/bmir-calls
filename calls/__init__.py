@@ -32,6 +32,7 @@ app = Flask(__name__)
 BASE_DIR = os.path.dirname(__file__)
 
 # Load config files
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config.from_pyfile(os.path.join(BASE_DIR, 'base_config.py'))
 site_config_path = os.path.join(BASE_DIR, '..', 'config.py')
 if os.path.exists(site_config_path):

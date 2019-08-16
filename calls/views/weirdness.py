@@ -7,6 +7,7 @@ from flask import (
     request,
 )
 
+from calls import constants
 from calls.models import (
     db,
     Submission,
@@ -55,7 +56,7 @@ def outgoing():
         # call came routed from the broadcast desk)
         if (
             not is_broadcast
-            and random.randint(1, app.config['WEIRDNESS_RANDOM_CHANCE_OF_BROADCAST']) == 1
+            and random.randint(1, constants.WEIRDNESS_RANDOM_CHANCE_OF_RINGING_BROADCAST) == 1
             and UserCodeConfig.get('random_weirdness_to_broadcast')
         ):
             return render_xml(
@@ -70,23 +71,24 @@ def outgoing():
                 ))
 
         # Otherwise it's a new call OR the person we called didn't confirm.
-        volunteer = Volunteer.get_random_opted_in()
+        multiring = UserCodeConfig.get('weirdness_multiring')
+        volunteers = Volunteer.get_random_opted_in(multiring=multiring)
 
-        if not volunteer:
-            return render_xml(
-                'hang_up.xml',
-                message='You lose. Thanks for playing! Better luck next time!',
-                with_song=True,
-            )
-        else:
+        if volunteers:
             return render_xml(
                 'call.xml',
                 record=True,
                 timeout=25,
                 from_number=app.config['WEIRDNESS_NUMBER'],
-                to_number=volunteer.phone_number,
+                to_numbers=[volunteer.phone_number for volunteer in volunteers],
                 action_url=protected_external_url('weirdness.outgoing'),
                 whisper_url=protected_external_url('weirdness.whisper'),
+            )
+        else:
+            return render_xml(
+                'hang_up.xml',
+                message='You lose. Thanks for playing! Better luck next time!',
+                with_song=True,
             )
 
 

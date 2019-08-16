@@ -8,6 +8,7 @@ from sqlalchemy.engine.url import make_url
 from flask import url_for
 
 from calls import app
+from calls import constants
 from calls.models import (
     db,
     Submission,
@@ -298,7 +299,8 @@ class BMIRCallsTests(unittest.TestCase):
         # ## (double pound) cheat code routes to weirdness phone outside
         response = self.client.post(
             url_for('outgoing'),
-            data={'From': 'sip:broadcast@domain', 'To': 'sip:%23%23@domain'})
+            data={'From': 'sip:broadcast@domain', 'To': 'sip:%23{}@domain'.format(
+                UserCodeConfig.BROADCAST_TO_WEIRDNESS_CODE)})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'weirdness@domain', response.data)
 
@@ -335,13 +337,15 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertIn(b'Invalid code. Please try again.', response.data)
         self.assertIsNone(UserCodeConfig.get('invalid_code_name'))
 
-    def test_broadcast_incoming(self):
+    @patch('random.randint')
+    def test_broadcast_incoming(self, randint):
         # Test basic incoming
         response = self.client.post(url_for('broadcast.incoming'))
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'broadcast@domain', response.data)
 
         # Not answering / busy go to voice mail
+        randint.return_value = 2
         for status in ('busy', 'no-answer', 'failed'):
             response = self.client.post(url_for('broadcast.incoming'),
                                         data={'DialCallStatus': status})
@@ -355,7 +359,18 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertIn(b'<Play', response.data)
 
         # Ringer turned off
-        UserCodeConfig.set('broadcast_incoming', False)
+        UserCodeConfig.set('broadcast_enable_incoming', False)
+        response = self.client.post(url_for('broadcast.incoming'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'<Record', response.data)
+
+        # Random chance of calling a Volunteer disabled/enabled
+        self.create_volunteer()
+        randint.return_value = 1
+        response = self.client.post(url_for('broadcast.incoming'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'+14169671111', response.data)
+        UserCodeConfig.set('random_broadcast_misses_to_weirdness', False)
         response = self.client.post(url_for('broadcast.incoming'))
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'<Record', response.data)
@@ -405,6 +420,20 @@ class BMIRCallsTests(unittest.TestCase):
             url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'+14169671111', response.data)
+
+        # Now let's test multiring enables/disables
+        for i in range(constants.MULTIRING_COUNT):  # 1 we should have one more number becuase of above
+            self.create_volunteer(self.create_submission(phone_number='+1555555555{}'.format(i)))
+        response = self.client.post(
+            url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data.count(b'<Number'), 1)  # Just one number = disabled
+        UserCodeConfig.set('weirdness_multiring', True)
+        response = self.client.post(
+            url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
+        self.assertEqual(response.status_code, 200)
+        # Now we should get N numbers when it's enabled
+        self.assertEqual(response.data.count(b'<Number'), constants.MULTIRING_COUNT)
 
     def test_weirdness_incoming(self):
         # Unknown number
