@@ -97,3 +97,20 @@ def json():
             Volunteer.id.desc()).all()],
         'timezone': str(app.config['SERVER_TZ'].zone),
     }
+
+
+@volunteers.route('/stats')
+@protected
+def json_stats():
+    unique_submissions = Submission.query.filter_by(
+        valid_phone=True).distinct('phone_number').count()
+    num_volunteers = Volunteer.query.count()
+    unique_unconfirmed = unique_submissions - num_volunteers
+
+    return {
+        'total_submissions': Submission.query.count(),
+        'unique_submissions': unique_submissions,
+        'unique_unconfirmed': unique_unconfirmed,
+        'num_volunteers': num_volunteers,
+        'conversion': round((num_volunteers / (num_volunteers + unique_unconfirmed)) * 100, 2)
+    }

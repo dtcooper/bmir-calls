@@ -194,7 +194,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(response.status_code, 409)
         self.assertEqual(Volunteer.query.count(), 1)
 
-    def test_json_view(self):
+    def test_json_views(self):
         submissions = [
             self.create_submission(phone_number='+1416967111{}'.format(n))
             for n in range(5)
@@ -212,6 +212,14 @@ class BMIRCallsTests(unittest.TestCase):
                 [item.id for item in items],
                 [item['id'] for item in response.json[key]])
         self.assertEqual(response.json['timezone'], 'US/Pacific')
+
+        response = self.client.get(url_for('volunteers.json_stats'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(int(response.json['conversion']), 100)
+        self.assertEqual(response.json['num_volunteers'], 5)
+        self.assertEqual(response.json['total_submissions'], 5)
+        self.assertEqual(response.json['unique_submissions'], 5)
+        self.assertEqual(response.json['unique_unconfirmed'], 0)
 
     def test_public_urls(self):
         response = self.client.get(url_for('health'))
