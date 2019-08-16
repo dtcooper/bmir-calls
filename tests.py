@@ -242,6 +242,7 @@ class BMIRCallsTests(unittest.TestCase):
             ('volunteers.verify', 'get', {'id': 1}),
             ('volunteers.verify', 'post', {'id': 1}),
             ('volunteers.json', 'get', {}),
+            ('volunteers.json_stats', 'get', {}),
             ('weirdness.outgoing', 'post', {}),
             ('weirdness.whisper', 'post', {}),
             ('weirdness.incoming', 'post', {}),
