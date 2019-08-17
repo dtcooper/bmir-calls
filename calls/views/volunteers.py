@@ -7,6 +7,7 @@ from flask import (
     Response,
 )
 
+from calls import constants
 from calls.models import (
     db,
     Submission,
@@ -95,7 +96,7 @@ def json():
             Submission.id.desc()).all()],
         'volunteers': [v.serialize() for v in Volunteer.query.order_by(
             Volunteer.id.desc()).all()],
-        'timezone': str(app.config['SERVER_TZ'].zone),
+        'timezone': str(constants.SERVER_TZ.zone),
     }
 
 

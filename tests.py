@@ -2,7 +2,6 @@ import re
 from unittest.mock import patch
 import unittest
 
-import pytz
 from sqlalchemy.engine.url import make_url
 
 from flask import url_for
@@ -31,7 +30,6 @@ class BMIRCallsTests(unittest.TestCase):
             'SERVER_NAME': 'example.com',
             'SQLALCHEMY_DATABASE_URI': str(testing_db_uri),
             'API_PASSWORD': '',
-            'SERVER_TZ': pytz.timezone('US/Pacific'),
             'BROADCAST_SIP_USERNAME': 'broadcast',
             'TWILIO_SIP_DOMAIN': 'domain',
             'WEIRDNESS_SIP_USERNAME': 'weirdness',
