@@ -112,5 +112,6 @@ def json_stats():
         'unique_submissions': unique_submissions,
         'unique_unconfirmed': unique_unconfirmed,
         'num_volunteers': num_volunteers,
-        'conversion': round((num_volunteers / (num_volunteers + unique_unconfirmed)) * 100, 2)
+        'conversion': round(
+            (num_volunteers / max(num_volunteers + unique_unconfirmed, 1)) * 100, 2)
     }

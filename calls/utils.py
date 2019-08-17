@@ -40,11 +40,18 @@ def sanitize_phone_number(phone_number, with_country_code=False):
 def protected(route):
     @wraps(route)
     def protected_route(*args, **kwargs):
-        password = request.args.get('password', '')
-        if password == app.config['API_PASSWORD'] or app.debug:
+        password_get = request.args.get('password', '')
+        password_auth = request.authorization.password if request.authorization else ''
+        if (
+            password_get == app.config['API_PASSWORD']
+            or password_auth == app.config['API_PASSWORD']
+            or app.debug
+        ):
             return route(*args, **kwargs)
         else:
-            return Response(status=403)
+            return Response(
+                status=401,
+                headers={'WWW-Authenticate': 'Basic realm="Password Required"'})
     return protected_route
 
 

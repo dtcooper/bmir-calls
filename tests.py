@@ -257,8 +257,8 @@ class BMIRCallsTests(unittest.TestCase):
                 response = getattr(self.client, method)(url_for(
                     route, password='incorrect', **kwargs))
                 self.assertEqual(
-                    response.status_code, 403,
-                    '{} returned a {}'.format(route, response.status_code))
+                    response.status_code, 401,
+                    'Route "{}" returned a {}'.format(route, response.status_code))
 
         finally:
             app.config['API_PASSWORD'] = ''
