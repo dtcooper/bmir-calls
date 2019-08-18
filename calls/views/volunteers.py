@@ -41,6 +41,7 @@ def submit():
 
             db.session.add(volunteer)
             db.session.commit()
+            app.logger.info('Volunteer {} updated by form'.format(volunteer.phone_number))
 
             try:
                 app.twilio.messages.create(
@@ -52,6 +53,8 @@ def submit():
                 pass
 
         else:
+            app.logger.info('Submission {} created (valid phone)'.format(
+                submission.phone_number))
             app.twilio.calls.create(
                 machine_detection='Enable',
                 machine_detection_silence_timeout=3000,
@@ -59,6 +62,9 @@ def submit():
                 from_=app.config['WEIRDNESS_NUMBER'],
                 to=submission.phone_number,
             )
+    else:
+        app.logger.info('Submission {} created (invalid phone)'.format(
+            submission.phone_number))
 
     return Response(status=200)
 
@@ -69,13 +75,20 @@ def verify(id):
     submission = Submission.query.filter_by(id=id).first_or_404()
 
     if request.values.get('AnsweredBy') == 'machine_start':
+        app.logger.warn(
+            "Couldn't verify submission id={} because of answering machine start".format(
+                submission.id))
         return render_xml('hang_up.xml')
 
     gather_times = get_gather_times()
 
     confirmed = request.values.get('Digits') == '1'
     if confirmed:
-        if not submission.create_volunteer():
+        if submission.create_volunteer():
+            app.logger.info('Volunteer {} added by call'.format(submission.phone_number))
+        else:
+            app.logger.warn("Couldn't create volunteer for submission id={}".format(
+                submission.id))
             return Response(status=409)  # Conflict
 
     return render_xml(

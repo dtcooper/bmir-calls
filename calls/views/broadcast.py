@@ -27,7 +27,7 @@ def outgoing():
     to_number = parse_sip_address(request.values.get('To'))
     if to_number:
         if to_number == '*':
-            app.logger.info('Routing broadcast phone to volunteer')
+            app.logger.info('Outgoing broadcast call routing to volunteer')
             # Cheat code * emulates a weirdness phone outgoing (calls a participant)
             return outgoing_weirdness()
         elif to_number == '#{}'.format(UserCodeConfig.BROADCAST_TO_WEIRDNESS_CODE):
@@ -48,19 +48,19 @@ def outgoing():
                 value = UserCodeConfig.get(code.name)
                 UserCodeConfig.set(code.name, not value)
 
-                app.logger.info('{} = {}'.format(code.name, not value))
+                app.logger.info('Updating code "{}" = {}'.format(code.name, not value))
                 message = ('{} is now {}. '.format(
                     code.description, 'disabled' if value else 'enabled') * 2).strip()
                 return render_xml('hang_up.xml', message=message, pause=1)
 
             else:
-                app.logger.info('Invalid code {}'.format(code))
+                app.logger.info('Invalid code {}'.format(to_number))
                 return render_xml('hang_up.xml', message='Invalid code. Please try again.')
 
         else:
             to_number = sanitize_phone_number(to_number)
             if to_number:
-                app.logger.info('Broadcast phone dialing {}'.format(to_number))
+                app.logger.info('Outgoing broadcast call dialing: {}'.format(to_number))
                 return render_xml(
                     'call.xml',
                     record=True,
@@ -69,7 +69,7 @@ def outgoing():
                 )
 
     # Catch-all
-    app.logger.warning("Broadcast phone couldn't complete call: {}".format(
+    app.logger.warning("Outgoing broadcast call couldn't complete: {}".format(
         request.values.get('To')))
     return render_xml('hang_up.xml', message=(
         'Your call cannot be completed as dialed. Please eat some cabbage, bring '
@@ -83,7 +83,7 @@ def incoming():
     calling_enabled = UserCodeConfig.get('broadcast_enable_incoming')
 
     if call_status == 'completed':
-        app.logger.info('Broadcast phone hung up on caller')
+        app.logger.info('Broadcast hung up on incoming caller')
         return render_xml('hang_up.xml', with_song=True)
 
     elif (
@@ -95,19 +95,19 @@ def incoming():
             random.randint(1, constants.INCOMING_CALLERS_RANDOM_CHANCE_OF_WEIRDNESS) == 1
             and lottery_enabled
         ):
-            app.logger.info('Incoming call missed (calling {}) from broadcast won '
+            app.logger.info('Incoming broadcast call missed (calling {}) won '
                             'lottery. Calling volunteer.'.format(
                                 'enabled' if calling_enabled else 'disabled'))
             return outgoing_weirdness()
         else:
-            app.logger.info('Sending incoming call missed (calling {}) from '
-                            'broadcast to voicemail (lottery {})'.format(
+            app.logger.info('Sending incoming broadcast call missed (calling {}) '
+                            'from broadcast to voicemail (lottery {})'.format(
                                 'enabled' if calling_enabled else 'disabled',
                                 'enabled' if lottery_enabled else 'disabled'))
             return render_xml('voicemail.xml')
 
     else:
-        app.logger.info('Incoming call ringing broadcast phone')
+        app.logger.info('Incoming broadcast call ringing')
         return render_xml(
             'call.xml',
             record=True,
