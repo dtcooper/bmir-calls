@@ -142,7 +142,7 @@ def incoming():
 
                 app.logger.info('Volunteer {} removed by call'.format(from_number))
                 return render_xml(
-                    'hang_up.xml',
+                    'hang_up.xml', with_song=True,
                     message=('You will no longer receive calls. To sign back up, '
                              'call this number or go to calls dot B M I R dot org.'))
             else:
