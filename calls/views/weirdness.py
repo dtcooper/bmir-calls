@@ -30,8 +30,7 @@ weirdness = Blueprint('weirdness', __name__, url_prefix='/weirdness')
 @weirdness.route('/outgoing', methods=('POST',))
 @protected
 def outgoing():
-    # We can come from the broadcast outgoing route, where we may want to change
-    # behaviour
+    # We can come from the broadcast outgoing route, where we may want to change behaviour
     is_broadcast = parse_sip_address(
         request.values.get('From')) == app.config['BROADCAST_SIP_USERNAME']
 
@@ -56,6 +55,8 @@ def outgoing():
         # call came routed from the broadcast desk)
         if (
             not is_broadcast
+            # Make sure this wasn't an outside caller who won the lottery
+            and not request.values.get('To') == app.config['BROADCAST_NUMBER']
             and random.randint(1, constants.WEIRDNESS_RANDOM_CHANCE_OF_RINGING_BROADCAST) == 1
             and UserCodeConfig.get('random_weirdness_to_broadcast')
         ):

@@ -58,7 +58,7 @@
                     if (item.type == 'text') {
                         nodeHTML += escapeHTML(item.body);
                     } else {
-                        nodeHTML += escapeHTML('[' + item.duration + ']' + item.transcription)
+                        nodeHTML += escapeHTML('[' + item.duration + '] ' + item.transcription)
                             +'<br><audio controls preload="none" src="'
                             + escapeHTML(item.url) + '" />';
                     }

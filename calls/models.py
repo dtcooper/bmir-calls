@@ -171,7 +171,14 @@ class Volunteer(VolunteerBase, db.Model):
         if not volunteers:
             return []
 
-        volunteers = random.sample(volunteers, constants.MULTIRING_COUNT if multiring else 1)
+        if multiring:
+            volunteers = (
+                random.sample(volunteers, constants.MULTIRING_COUNT)
+                if len(volunteers) > constants.MULTIRING_COUNT
+                else volunteers
+            )
+        else:
+            volunteers = [random.choice(volunteers)]
 
         if update_last_called:
             now = datetime.datetime.now(constants.SERVER_TZ)
