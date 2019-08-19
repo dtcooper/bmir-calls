@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMIR Telephone Admin Panel</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='tacit.min.css') }}">
+    <style>
+        h1 { margin-top: 0; }
+        form { margin-bottom: 0; }
+        ul { padding: 0; }
+        .ringer-on { background-color: #8bcc39 !important; }
+        .ringer-off { background-color: #f06543 !important; }
+        .center { text-align: center; }
+        .hidden { display: none; }
+    </style>
+    <script src="{{ url_for('static', filename='jquery.min.js') }}"></script>
+    <script>
+        function escapeHTML(unsafe) {
+            return unsafe
+                 .replace(/&/g, "&amp;")
+                 .replace(/</g, "&lt;")
+                 .replace(/>/g, "&gt;")
+                 .replace(/"/g, "&quot;")
+                 .replace(/'/g, "&#039;");
+        }
+
+        var seen = {'text': {'ids': new Set(), 'max': -1},
+                    'voicemail': {'ids': new Set(), 'max': -1}};
+
+        var updatePage = function(notimeout) {
+            {% if show_all %}
+                {% set url_for_kwargs = {'all': 'y'} %}
+            {% else %}
+                {% set url_for_kwargs = {} %}
+            {% endif %}
+
+            var url = {{ protected_url_for('panel.data', **url_for_kwargs) | tojson }};
+            if (seen.text.max > -1) {
+                url += ((url.indexOf('?') == -1) ? '?' : '&')
+                    + 'after_text_id=' + seen.text.max;
+            }
+            if (seen.voicemail.max > -1) {
+                url += ((url.indexOf('?') == -1) ? '?' : '&')
+                    + 'after_voicemail_id=' + seen.voicemail.max;
+            }
+
+            $.getJSON(url, function(data) {
+                for (var i = 0; i < data.items.length; i++) {
+                    var item = data.items[i];
+                    if (seen[item.type].ids.has(item.id)) {
+                        continue;
+                    }
+
+                    var nodeHTML = '<tr>\n<td class="center">' + escapeHTML(item.created)
+                        + '<br>' + escapeHTML(item.phone_number) + '</td><td>';
+
+                    if (item.type == 'text') {
+                        nodeHTML += escapeHTML(item.body);
+                    } else {
+                        nodeHTML += escapeHTML('[' + item.duration + ']' + item.transcription)
+                            +'<br><audio controls preload="none" src="'
+                            + escapeHTML(item.url) + '" />';
+                    }
+
+                    nodeHTML += '</td></tr>';
+
+                    var node = $(nodeHTML);
+
+                    $('#data').prepend(node);
+                    seen[item.type].ids.add(item.id);
+                    seen[item.type].max = Math.max(seen[item.type].max, item.id);
+                }
+
+                for (i = 0; i < data.codes.length; i++) {
+                    var code = data.codes[i][0];
+                    var value = data.codes[i][1];
+
+                    $('#' + code).text(value ? 'enabled' : 'disabled');
+
+                    if (code == 'broadcast_enable_incoming') {
+                        if (value) {
+                            $('.ringer-on').show();
+                            $('.ringer-off').hide();
+                        } else {
+                            $('.ringer-on').hide();
+                            $('.ringer-off').show();
+                        }
+                    }
+                }
+            }).always(function() {
+                if (!notimeout) {
+                    setTimeout(updatePage, 12500);
+                }
+            });
+        }
+
+        $(function() {
+            updatePage();
+
+            $(document).keypress(function(evt) {
+                if(evt.key == 'r') { //r
+                    updatePage(true);
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+<section>
+  <article>
+    <h1 class="title">BMIR Phone Admin Panel</h1>
+
+    <form method="post" action="{{ url_for('panel.landing') }}">
+        <button class="hidden ringer-on" type="submit" name="ringer" value="false">
+            Ringer: <strong>ON</strong>
+        </button>
+        <button class="hidden ringer-off" type="submit" name="ringer" value="true">
+            Ringer: <strong>OFF</strong>
+        </button>
+    </form>
+
+    Cheat Codes:
+    <ul>
+        <li><code>*</code> &mdash; Call random Phone Experiment participant</li>
+        {% for code in codes %}
+            <li>
+                <code>#{{ code.number }}</code> &mdash;
+                Toggle {{ code.description|lower }}
+                (<span id="{{ code.name }}"></span>)
+            </li>
+
+            {% if code.number == '#' %}
+                <li><code>#{{ outside_code }}</code> &mdash; Call outside phone</li>
+            {% endif %}
+        {% endfor %}
+    </ul>
+
+    <table>
+        <thead>
+            <tr>
+                <th width="29%" class="center">From / Created / Type</th>
+                <th width="71%" class="center">Message</th>
+            </tr>
+        </thead>
+        <tbody id="data"></tbody>
+    </table>
+    {% if not show_all %}
+        <div class="center">
+            <a href="{{ url_for('panel.landing', all='y') }}">
+                <button>Load all...</button>
+            </a>
+        </div>
+    {% endif %}
+
+  </article>
+</section>
+</body>
+</html>

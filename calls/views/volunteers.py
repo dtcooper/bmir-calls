@@ -75,7 +75,7 @@ def verify(id):
     submission = Submission.query.filter_by(id=id).first_or_404()
 
     if request.values.get('AnsweredBy') == 'machine_start':
-        app.logger.warn(
+        app.logger.warning(
             "Couldn't verify submission id={} because of answering machine start".format(
                 submission.id))
         return render_xml('hang_up.xml')
@@ -87,8 +87,8 @@ def verify(id):
         if submission.create_volunteer():
             app.logger.info('Volunteer {} added by call'.format(submission.phone_number))
         else:
-            app.logger.warn("Couldn't create volunteer for submission id={}".format(
-                submission.id))
+            app.logger.warning(
+                "Couldn't create volunteer for submission id={}".format(submission.id))
             return Response(status=409)  # Conflict
 
     return render_xml(

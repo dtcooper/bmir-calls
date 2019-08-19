@@ -12,6 +12,7 @@ RUN apt-get update \
 
 ENV FLASK_ENV development
 ENV FLASK_APP calls
+ENV FLASK_RUN_HOST 0.0.0.0
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -26,4 +27,4 @@ COPY requirements.txt /app/
 RUN pip install -r requirements.txt
 
 COPY . /app
-CMD flask run -h 0.0.0.0
+CMD flask run

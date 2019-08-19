@@ -1,3 +1,4 @@
+import datetime
 import random
 
 from flask import (
@@ -8,7 +9,12 @@ from flask import (
 )
 
 from calls import constants
-from calls.models import UserCodeConfig
+from calls.models import (
+    db,
+    Text,
+    UserCodeConfig,
+    Voicemail,
+)
 from calls.utils import (
     parse_sip_address,
     protected,
@@ -79,6 +85,11 @@ def outgoing():
 @broadcast.route('/incoming', methods=('POST',))
 @protected
 def incoming():
+    if request.args.get('voicemail'):
+        return render_xml(
+            'hang_up.xml', with_song=True,
+            message='Did you want to re-record that? Too bad.')
+
     call_status = request.values.get('DialCallStatus')
     calling_enabled = UserCodeConfig.get('broadcast_enable_incoming')
 
@@ -104,7 +115,11 @@ def incoming():
                             'from broadcast to voicemail (lottery {})'.format(
                                 'enabled' if calling_enabled else 'disabled',
                                 'enabled' if lottery_enabled else 'disabled'))
-            return render_xml('voicemail.xml')
+            return render_xml(
+                'voicemail.xml',
+                action_url=protected_external_url('broadcast.incoming', voicemail='y'),
+                transcribe_callback_url=protected_external_url('broadcast.transcribe')
+            )
 
     else:
         app.logger.info('Incoming broadcast call ringing')
@@ -120,7 +135,35 @@ def incoming():
         )
 
 
+@broadcast.route('/transcribe', methods=('POST',))
+def transcribe():
+    from_number = request.values.get('From')
+    voicemail = Voicemail(
+        phone_number=from_number,
+        transcription=request.values.get('TranscriptionText'),
+        url=request.values.get('RecordingUrl'),
+    )
+    db.session.add(voicemail)
+    db.session.commit()
+
+    # This could fail, and we wouldn't want to lose the voicemail
+    voicemail.duration = datetime.timedelta(
+        seconds=int(app.twilio.recordings.get(
+            request.values.get('RecordingSid')).fetch().duration))
+    db.session.add(voicemail)
+    db.session.commit()
+
+    app.logger.info('Got voicemail from {}'.format(from_number))
+    return Response(status=204)
+
+
 @broadcast.route('/sms', methods=('POST',))
 @protected
 def sms():
-    return Response(status=501)
+    from_number = request.values.get('From')
+    text = Text(phone_number=from_number, body=request.values.get('Body'))
+    db.session.add(text)
+    db.session.commit()
+
+    app.logger.info('Received sms from {}'.format(from_number))
+    return Response(status=204)

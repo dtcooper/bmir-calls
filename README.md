@@ -36,10 +36,10 @@ Run the application which'll then be available at
 # Brings up the server (will auto-reload for development)
 docker-compose up
 
-# Or enter the container to run the server manually (must listen on 0.0.0.0)
-# Useful for development, using a debugger, using the Python shell, etc
+# Or enter the container to run the server manually, useful for development,
+# using a debugger, using the Python shell, etc
 docker-compose run --service-ports app bash
-flask run -h 0.0.0.0
+flask run
 ```
 
 ## License

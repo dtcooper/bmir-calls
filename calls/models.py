@@ -18,12 +18,13 @@ from calls.utils import sanitize_phone_number
 db = SQLAlchemy()
 
 
-class VolunteerBase:
-    id = db.Column(db.Integer, primary_key=True)
-    created = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
-    phone_number = db.Column(db.String(20), nullable=False)
-    opt_in_hours = db.Column(postgresql.ARRAY(db.SmallInteger, dimensions=1), nullable=False, default=list(range(24)))
-    country_code = db.Column(db.String(2), nullable=False, default='??')
+class BaseMixin:
+    @db.validates('country_code', 'phone_number', 'timezone', 'name')
+    def validate_code(self, key, value):
+        max_len = getattr(self.__class__, key).prop.columns[0].type.length
+        if value and len(value) > max_len:
+            return value[:max_len]
+        return value
 
     def serialize(self):
         data = {col.name: getattr(self, col.name) for col in self.__table__.columns}
@@ -33,20 +34,22 @@ class VolunteerBase:
             if isinstance(column.type, db.DateTime):
                 value = data[column.name]
                 if value:
-                    data[column.name] = str(value.astimezone(constants.SERVER_TZ))
+                    data[column.name] = value.astimezone(constants.SERVER_TZ).strftime(
+                        constants.SERIALIZE_STRFTIME)
 
         return data
-
-    @db.validates('country_code', 'phone_number', 'timezone')
-    def validate_code(self, key, value):
-        max_len = getattr(self.__class__, key).prop.columns[0].type.length
-        if value and len(value) > max_len:
-            return value[:max_len]
-        return value
 
     def __repr__(self):
         return '<{} {}>'.format(
             self.__class__.__name__, self.phone_number)
+
+
+class VolunteerBase(BaseMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    created = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
+    phone_number = db.Column(db.String(20), nullable=False)
+    opt_in_hours = db.Column(postgresql.ARRAY(db.SmallInteger, dimensions=1), nullable=False, default=list(range(24)))
+    country_code = db.Column(db.String(2), nullable=False, default='??')
 
 
 class Submission(VolunteerBase, db.Model):
@@ -180,18 +183,19 @@ class Volunteer(VolunteerBase, db.Model):
         return volunteers
 
 
-class UserCodeConfig(db.Model):
-    UserCode = namedtuple('UserCode', ('number', 'name', 'default', 'description'))
+class UserCodeConfig(BaseMixin, db.Model):
+    UserCode = namedtuple('UserCode', (
+        'number', 'name', 'default', 'description'))
     BROADCAST_TO_WEIRDNESS_CODE = '1'
     CODES = (
         UserCode('#', 'broadcast_enable_incoming', True,
                  'Broadcast desk phone ringer'),
-        UserCode('77', 'random_broadcast_misses_to_weirdness', True,
-                 'BMIR callers randomly calling the outside phone'),
-        UserCode('88', 'random_weirdness_to_broadcast', False,
-                 'Outside phone randomly calling the broadcast desk'),
-        UserCode('99', 'weirdness_multiring', False,
-                 'Outside phone ringing multiple people simultaneously'),
+        UserCode('2', 'random_broadcast_misses_to_weirdness', True,
+                 'Missed callers randomly calling experiment participants'),
+        UserCode('3', 'random_weirdness_to_broadcast', False,
+                 'Outside phone randomly calling the broadcast desk phone'),
+        UserCode('9', 'weirdness_multiring', False,
+                 'Ringing multiple experiment participants simultaneously'),
     )
     CODES_BY_NUMBER = {code.number: code for code in CODES}
     CODES_BY_NAME = {code.name: code for code in CODES}
@@ -228,3 +232,42 @@ class UserCodeConfig(db.Model):
 
     def __repr__(self):
         return '<UserCodeConfig {}={!r}>'.format(self.name, self.value)
+
+
+class Text(BaseMixin, db.Model):
+    __tablename__ = 'texts'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
+    phone_number = db.Column(db.String(20), nullable=False)
+    body = db.Column(db.Text, nullable=False)
+
+    __table_args__ = (db.Index('text_created_key', created),)
+
+
+class Voicemail(BaseMixin, db.Model):
+    __tablename__ = 'voicemails'
+
+    id = db.Column(db.Integer, primary_key=True)
+    created = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
+    phone_number = db.Column(db.String(20), nullable=False)
+    duration = db.Column(db.Interval, default=datetime.timedelta(0))
+    transcription = db.Column(db.Text, nullable=True)
+    url = db.Column(db.String, nullable=False)
+
+    __table_args__ = (db.Index('voicemail_created_key', created),)
+
+    def serialize(self):
+        data = super(Voicemail, self).serialize()
+
+        if not data['transcription']:
+            data['transcription'] = '[Unable to transcribe]'
+
+        if data['duration'] >= datetime.timedelta(hours=1):
+            data['duration'] = str(data['duration'])
+        else:
+            data['duration'] = '{}:{:02d}'.format(
+                data['duration'].seconds // 60,
+                data['duration'].seconds % 60)
+
+        return data

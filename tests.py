@@ -1,3 +1,4 @@
+import datetime
 import re
 from unittest.mock import patch
 import unittest
@@ -11,7 +12,9 @@ from calls import constants
 from calls.models import (
     db,
     Submission,
+    Text,
     UserCodeConfig,
+    Voicemail,
     Volunteer,
 )
 
@@ -330,7 +333,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertIsNone(UserCodeConfig.get('invalid_code_name'))
         response = self.client.post(
             url_for('outgoing'), data={'From': 'sip:broadcast@domain',
-                                       'To': 'sip:%239@domain'.format(code.number)})
+                                       'To': 'sip:%236@domain'.format(code.number)})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Invalid code. Please try again.', response.data)
         self.assertIsNone(UserCodeConfig.get('invalid_code_name'))
@@ -373,9 +376,38 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'<Record', response.data)
 
+        # Voicemail complete
+        response = self.client.post(url_for('broadcast.incoming', voicemail='y'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Did you want to re-record that? Too bad.', response.data)
+
+    def test_broadcast_transcribe(self):
+        self.assertEqual(Voicemail.query.count(), 0)
+        self.twilio_mock.recordings.get().fetch().duration = 75
+        response = self.client.post(
+            url_for('broadcast.transcribe'),
+            data={'From': '+14164390000', 'TranscriptionText': 'this is my transcription',
+                  'RecordingUrl': 'http://example.com/my-url.mp3'})
+        self.assertEqual(response.status_code, 204)
+
+        self.assertEqual(Voicemail.query.count(), 1)
+        voicemail = Voicemail.query.first()
+        self.assertEqual(voicemail.phone_number, '+14164390000')
+        self.assertEqual(voicemail.transcription, 'this is my transcription')
+        self.assertEqual(voicemail.url, 'http://example.com/my-url.mp3')
+        self.assertEqual(voicemail.duration, datetime.timedelta(seconds=75))
+
     def test_broadcast_sms(self):
-        response = self.client.post(url_for('broadcast.sms'))
-        self.assertEqual(response.status_code, 501)
+        self.assertEqual(Text.query.count(), 0)
+        response = self.client.post(
+            url_for('broadcast.sms'),
+            data={'From': '+14164390000', 'Body': 'This is a test sms'})
+        self.assertEqual(response.status_code, 204)
+
+        self.assertEqual(Text.query.count(), 1)
+        text = Text.query.first()
+        self.assertEqual(text.phone_number, '+14164390000')
+        self.assertEqual(text.body, 'This is a test sms')
 
     @patch('random.randint')
     def test_weirdness_outgoing(self, randint):
@@ -525,3 +557,48 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(Volunteer.query.count(), 0)
         self.assertIn(b'You will no longer receive calls', response.data)
         self.assertIn(b'SIGN UP', response.data)
+
+    def test_panel_landing(self):
+        response = self.client.get(url_for('panel.landing'))
+        self.assertEqual(response.status_code, 200)
+
+        self.assertTrue(UserCodeConfig.get('broadcast_enable_incoming'))
+        response = self.client.post(url_for('panel.landing'), data={'ringer': 'false'})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, url_for('panel.landing'))
+        self.assertFalse(UserCodeConfig.get('broadcast_enable_incoming'))
+
+    def test_panel_data(self):
+        texts = [Text(phone_number='+14169671111', body='message') for i in range(10)]
+        voicemails = [Voicemail(phone_number='+14169671111', transcription='voicemail',
+                                url='http://example.com') for i in range(4)]
+        voicemails.append(Voicemail(phone_number='+14169671111', url='http://example.com',
+                                    duration=datetime.timedelta(hours=6)))
+
+        db.session.add_all(texts)
+        db.session.add_all(voicemails)
+        db.session.commit()
+
+        response = self.client.get(url_for('panel.data', all='y'))
+        self.assertEqual(response.status_code, 200)
+
+        self.assertIn('items', response.json)
+        self.assertCountEqual(
+            [i.id for i in (texts + voicemails)],
+            [i['id'] for i in response.json['items']])
+
+        self.assertIn('codes', response.json)
+        self.assertCountEqual(
+            [[code.name, UserCodeConfig.get(code.name)] for code in UserCodeConfig.CODES],
+            response.json['codes'])
+
+        texts.sort(key=lambda t: t.id)
+        voicemails.sort(key=lambda v: v.id)
+        response = self.client.get(url_for('panel.data',
+                                           after_text_id=texts[-4].id,
+                                           after_voicemail_id=voicemails[-3].id))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('items', response.json)
+        self.assertCountEqual(
+            [i.id for i in (texts[-3:] + voicemails[-2:])],
+            [i['id'] for i in response.json['items']])

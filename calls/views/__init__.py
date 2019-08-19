@@ -2,6 +2,7 @@ from calls.views.broadcast import (
     broadcast,
     outgoing as outgoing_broadcast,
 )
+from calls.views.panel import panel
 from calls.views.volunteers import volunteers
 from calls.views.weirdness import (
     outgoing as outgoing_weirdness,
@@ -9,5 +10,5 @@ from calls.views.weirdness import (
 )
 
 
-__all__ = ('broadcast', 'volunteers', 'outgoing_broadcast',
+__all__ = ('broadcast', 'panel', 'volunteers', 'outgoing_broadcast',
            'outgoing_weirdness', 'weirdness')

@@ -22,6 +22,7 @@ from calls.views import (
     broadcast,
     outgoing_broadcast,
     outgoing_weirdness,
+    panel,
     volunteers,
     weirdness,
 )
@@ -50,6 +51,7 @@ app.twilio = TwilioClient(
 
 # Register blueprints
 app.register_blueprint(broadcast)
+app.register_blueprint(panel)
 app.register_blueprint(volunteers)
 app.register_blueprint(weirdness)
 
@@ -68,6 +70,8 @@ def extra_template_context():
         'song_url': url_for('static', filename='songs/{}'.format(
             random.choice(SONGS)), _external=True),
         'recording_enabled_globally': app.config['RECORDING_ENABLED'],
+        'protected_url_for': lambda *args, **kwargs: url_for(
+            *args, **kwargs, password=app.config['API_PASSWORD']),
     }
 
 
