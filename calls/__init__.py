@@ -61,7 +61,8 @@ app.register_blueprint(weirdness)
 if app.debug:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
 
-if app.config['ENV'] == 'production' and not os.environ.get('FLASK_RUN_FROM_CLI'):
+# Unless we're running from flask cli, enable gunicorn loggers
+if not os.environ.get('FLASK_RUN_FROM_CLI'):
     gunicorn_logger = logging.getLogger('gunicorn.error')
     app.logger.handlers = gunicorn_logger.handlers
     app.logger.setLevel(gunicorn_logger.level)
