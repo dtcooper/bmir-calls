@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 
@@ -59,6 +60,11 @@ app.register_blueprint(weirdness)
 # Gunicorn does this automatically, but Flask's development server does not.
 if app.debug:
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+if app.config['ENV'] == 'production' and not os.environ.get('FLASK_RUN_FROM_CLI'):
+    gunicorn_logger = logging.getLogger('gunicorn.error')
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
 
 
 SONGS = os.listdir(os.path.join(BASE_DIR, 'static', 'songs'))
