@@ -127,5 +127,7 @@ def json_stats():
         'unique_unconfirmed': unique_unconfirmed,
         'num_volunteers': num_volunteers,
         'conversion': round(
-            (num_volunteers / max(num_volunteers + unique_unconfirmed, 1)) * 100, 2)
+            (num_volunteers / max(num_volunteers + unique_unconfirmed, 1)) * 100, 2),
+        'num_volunteers_called': Volunteer.query.filter(
+            Volunteer.last_called.isnot(None)).count(),
     }
