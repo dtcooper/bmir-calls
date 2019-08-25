@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
+    {% if say_first %}
+        <Say>{{ say_first }}</Say>
+    {% endif %}
     <Dial
         answerOnBridge="true"
-        ringTone="us-old"
+        ringTone="us"
         callerId="{{ from_number }}"
         timeout="{{ timeout|default(30) }}"
         {% if recording_enabled_globally and record %}record="record-from-answer" trim="trim-silence"{% endif %}

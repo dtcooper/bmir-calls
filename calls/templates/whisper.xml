@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
     {% if confirmed %}
-        <Say>
-            <prosody rate="x-fast">
-                Your call may be recorded for quality assurance purposes.
-            </prosody>
-        </Say>
+        <Say>Your call may be recorded for quality assurance purposes.</Say>
     {% elif has_gathered %}
         <Hangup />
     {% else %}
@@ -15,9 +11,6 @@
                 <Say>
                     Incoming call from Black Rock City, press any key to accept.
                 </Say>
-                {% if not loop.last %}
-                    <Pause length="1" />
-                {% endif %}
             {% endfor %}
         </Gather>
     {% endif %}
