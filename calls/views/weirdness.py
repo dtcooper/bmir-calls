@@ -81,19 +81,15 @@ def outgoing():
             app.logger.info('Outgoing weirdness call to {}'.format(
                 to_numbers[0] if len(to_numbers) == 1 else to_numbers
             ))
-            kwargs = {}
-            if not request.args.get('not_first_try'):
-                kwargs['say_first'] = 'Your call may be recorded for quality assurance purposes.'
-
             return render_xml(
                 'call.xml',
                 record=True,
                 timeout=20,
+                say_first='Your call may be recorded for quality assurance purposes.',
                 from_number=app.config['WEIRDNESS_NUMBER'],
                 to_numbers=to_numbers,
-                action_url=protected_external_url('weirdness.outgoing', not_first_try='y'),
+                action_url=protected_external_url('weirdness.outgoing'),
                 whisper_url=protected_external_url('weirdness.whisper'),
-                **kwargs,
             )
         else:
             app.logger.info('Outgoing weirdness call found no volunteers. Hanging up.')
