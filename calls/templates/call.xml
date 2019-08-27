@@ -2,7 +2,7 @@
 <Response>
     <Dial
         answerOnBridge="true"
-        ringTone="us-old"
+        ringTone="us"
         callerId="{{ from_number }}"
         timeout="{{ timeout|default(30) }}"
         {% if recording_enabled_globally and record %}record="record-from-answer" trim="trim-silence"{% endif %}
