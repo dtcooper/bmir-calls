@@ -84,8 +84,7 @@ def outgoing():
             return render_xml(
                 'call.xml',
                 record=True,
-                timeout=20,
-                say_first='Your call may be recorded for quality assurance purposes.',
+                timeout=25,
                 from_number=app.config['WEIRDNESS_NUMBER'],
                 to_numbers=to_numbers,
                 action_url=protected_external_url('weirdness.outgoing'),

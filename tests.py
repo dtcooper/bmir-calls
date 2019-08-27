@@ -426,8 +426,6 @@ class BMIRCallsTests(unittest.TestCase):
             url_for('outgoing'), data={'From': 'sip:weirdness@domain'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'+14169671111', response.data)
-        self.assertIn(
-            b'Your call may be recorded for quality assurance purposes.', response.data)
         self.assertIsNotNone(volunteer.last_called)
 
         # Hung up on, 30s after a call (alternate phone)
