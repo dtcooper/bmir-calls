@@ -34,9 +34,10 @@ class BMIRCallsTests(unittest.TestCase):
             'SQLALCHEMY_DATABASE_URI': str(testing_db_uri),
             'API_PASSWORD': '',
             'BROADCAST_SIP_USERNAME': 'broadcast',
+            'OUTGOING_SIP_USERNAME': 'outgoing',
             'TWILIO_SIP_DOMAIN': 'domain',
+            'WEIRDNESS_SIP_ALT_USERNAMES': {'weirdness-alt1', 'weirdness-alt2'},
             'WEIRDNESS_SIP_USERNAME': 'weirdness',
-            'WEIRDNESS_SIP_ALT_USERNAMES': {'weirdness-alt1', 'weirdness-alt2'}
         })
 
         self.context = app.app_context()
@@ -50,6 +51,10 @@ class BMIRCallsTests(unittest.TestCase):
         self.context.pop()
         self.twilio_patch.stop()
 
+    def mock_sanitize_phone_number(self, phone_number, country_code='US'):
+        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = phone_number
+        self.twilio_mock.lookups.phone_numbers().fetch().country_code = country_code
+
     def get_submit_json(self, **kwargs):
         json_data = {
             'phone_number': '416-967-1111',
@@ -58,10 +63,8 @@ class BMIRCallsTests(unittest.TestCase):
             'timezone': '[GMT-07:00] Pacific Time // Black Rock City Time (US/Pacific)',
         }
         json_data.update(kwargs)
-
         mock_phone = '+1{}'.format(re.sub(r'[^0-9]', '', json_data['phone_number']))
-        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = mock_phone
-        self.twilio_mock.lookups.phone_numbers().fetch().country_code = 'US'
+        self.mock_sanitize_phone_number(mock_phone)
 
         return json_data
 
@@ -278,7 +281,7 @@ class BMIRCallsTests(unittest.TestCase):
     @patch('random.randint')
     def test_broadcast_outgoing(self, randint):
         # Invalid number
-        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = None
+        self.mock_sanitize_phone_number(None)
         response = self.client.post(
             url_for('outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:0114169671111@domain'})
@@ -290,7 +293,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertIn(b'Your call cannot be completed as dialed.', response.data)
 
         # Outgoing number
-        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14169671111'
+        self.mock_sanitize_phone_number('+14169671111')
         response = self.client.post(
             url_for('outgoing'),
             data={'From': 'sip:broadcast@domain', 'To': 'sip:0014169671111@domain'})
@@ -409,6 +412,26 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertEqual(text.phone_number, '+14164390000')
         self.assertEqual(text.body, 'This is a test sms')
 
+    def test_regular_outgoing(self):
+        # Regular outgoing call
+        self.mock_sanitize_phone_number('+14164390000')
+        response = self.client.post(
+            url_for('outgoing'), data={'From': 'sip:outgoing@domain',
+                                       'To': 'sip:0114164390000@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'', response.data)
+        self.assertIn(b'+14164390000', response.data)
+
+        # * routes to a volunteer
+        volunteer = self.create_volunteer()
+        self.assertIsNone(volunteer.last_called)
+        response = self.client.post(
+            url_for('outgoing'), data={'From': 'sip:outgoing@domain',
+                                       'To': 'sip:*@domain'})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'+14169671111', response.data)
+        self.assertIsNotNone(volunteer.last_called)
+
     @patch('random.randint')
     def test_weirdness_outgoing(self, randint):
         randint.return_value = 2  # Don't call broadcast
@@ -467,13 +490,13 @@ class BMIRCallsTests(unittest.TestCase):
 
     def test_weirdness_incoming(self):
         # Unknown number
-        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = None
+        self.mock_sanitize_phone_number(None)
         response = self.client.post(url_for('weirdness.incoming'),
                                     data={'From': '+15555551234'})
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Call with your caller ID unblocked to get through', response.data)
 
-        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14164390000'
+        self.mock_sanitize_phone_number('+14164390000')
 
         # First run through of menu
         response = self.client.post(
@@ -522,7 +545,7 @@ class BMIRCallsTests(unittest.TestCase):
         self.assertIn(b'Go to https://calls.bmir.org/ to sign up for BMIR Phone Experiment.',
                       response.data)
 
-        self.twilio_mock.lookups.phone_numbers().fetch().phone_number = '+14164390000'
+        self.mock_sanitize_phone_number('+14164390000')
 
         # Message for non-enrolled number
         response = self.client.post(url_for('weirdness.sms'),

@@ -109,7 +109,6 @@ def outgoing():
         to_number = parse_sip_address(request.values.get('To'))
         if to_number == '*':
             return outgoing_weirdness()
-
         else:
             to_number = sanitize_phone_number(to_number)
             return render_xml(
