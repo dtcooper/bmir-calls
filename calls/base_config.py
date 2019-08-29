@@ -16,3 +16,5 @@ WEIRDNESS_SIGNUP_GOOGLE_FORM_URL = 'https://docs.google.com/forms/link-to-my-for
 WEIRDNESS_NUMBER = '+15555551234'
 WEIRDNESS_SIP_USERNAME = 'weirdness'
 WEIRDNESS_SIP_ALT_USERNAMES = {'weirdness-alt1', 'weirdness-alt2'}
+
+OUTGOING_SIP_USERNAME = 'outgoing'

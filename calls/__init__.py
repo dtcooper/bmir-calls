@@ -18,6 +18,7 @@ from calls.utils import (
     parse_sip_address,
     protected,
     render_xml,
+    sanitize_phone_number,
 )
 from calls.views import (
     broadcast,
@@ -104,5 +105,17 @@ def outgoing():
         or from_address in app.config['WEIRDNESS_SIP_ALT_USERNAMES']
     ):
         return outgoing_weirdness()
-    else:
-        return render_xml('hang_up.xml', message='Invalid SIP address.')
+    elif from_address == app.config['OUTGOING_SIP_USERNAME']:
+        to_number = parse_sip_address(request.values.get('To'))
+        if to_number == '*':
+            return outgoing_weirdness()
+
+        else:
+            to_number = sanitize_phone_number(to_number)
+            return render_xml(
+                'call.xml',
+                from_number=app.config['WEIRDNESS_NUMBER'],
+                to_number=to_number,
+            )
+
+    return render_xml('hang_up.xml', message='Invalid SIP address.')
