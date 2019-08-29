@@ -243,6 +243,7 @@ class BMIRCallsTests(unittest.TestCase):
             ('outgoing', 'post', {}),
             ('broadcast.incoming', 'post', {}),
             ('broadcast.sms', 'post', {}),
+            ('broadcast.transcribe', 'post', {}),
             ('volunteers.submit', 'post', {}),
             ('volunteers.verify', 'get', {'id': 1}),
             ('volunteers.verify', 'post', {'id': 1}),

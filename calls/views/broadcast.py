@@ -136,6 +136,7 @@ def incoming():
 
 
 @broadcast.route('/transcribe', methods=('POST',))
+@protected
 def transcribe():
     from_number = request.values.get('From')
     voicemail = Voicemail(
