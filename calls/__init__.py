@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import subprocess
 
 from twilio.rest import Client as TwilioClient
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -81,6 +82,19 @@ def extra_template_context():
         'protected_url_for': lambda *args, **kwargs: url_for(
             *args, **kwargs, password=app.config['API_PASSWORD']),
     }
+
+
+try:
+    GIT_REV = subprocess.check_output(
+        ['git', 'rev-parse', '--short', 'HEAD']).strip()
+except subprocess.CalledProcessError:
+    GIT_REV = 'unknown'
+
+
+@app.after_request
+def add_git_rev_header(response):
+    response.headers['X-Calls-Git-Rev'] = GIT_REV
+    return response
 
 
 @app.route('/health')
