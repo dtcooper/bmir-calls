@@ -6,3 +6,4 @@ __pycache__/
 /config.py
 venv/
 calls.sock
+calls.pid
