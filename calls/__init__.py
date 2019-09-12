@@ -87,7 +87,7 @@ def extra_template_context():
 try:
     GIT_REV = subprocess.check_output(
         ['git', 'rev-parse', '--short', 'HEAD']).strip()
-except subprocess.CalledProcessError:
+except subprocess.CalledProcessError:  # skip coverage
     GIT_REV = 'unknown'
 
 
