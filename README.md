@@ -3,7 +3,7 @@
 Here's the [Flask](https://palletsprojects.com/p/flask/) app that routes calls
 to and from [Burning Man Information Radio (BMIR)](https://bmir.org), for both
 the broadcast desk (the "broadcast phone") and our new for 2019, in-lounge
-hotline (the "weirdness phone") via
+hotline (the "BMIR Phone Experiment" or "weirdness" phone) via
 [Twilio](https://www.twilio.com/).
 
 Here's a [link to the Google form](https://calls.bmir.org/) where you can enroll.
