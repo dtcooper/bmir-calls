@@ -133,7 +133,7 @@ def outgoing():
                 )
             else:
                 return render_xml('hang_up.xml', message=(
-                    'Your call cannot be completed as dialed. You dialed an nnvalid number. Please eat some cabbage, bring '
+                    'Your call cannot be completed as dialed. You dialed an invalid number. Please eat some cabbage, bring '
                     'in your dry cleaning and try your call again. Good bye.'))
 
     return render_xml('hang_up.xml', message='Invalid SIP address.')
