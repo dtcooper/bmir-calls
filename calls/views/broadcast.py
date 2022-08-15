@@ -32,47 +32,47 @@ broadcast = Blueprint('broadcast', __name__, url_prefix='/broadcast')
 def outgoing():
     to_number = parse_sip_address(request.values.get('To'))
     if to_number:
-        if to_number == '*':
-            app.logger.info('Outgoing broadcast call routing to volunteer')
-            # Cheat code * emulates a weirdness phone outgoing (calls a participant)
-            return outgoing_weirdness()
-        elif to_number == '#{}'.format(UserCodeConfig.BROADCAST_TO_WEIRDNESS_CODE):
-            # Cheat code ## calls the weirdness phone incoming (calls outdoor phone)
-            app.logger.info('Routing broadcast phone to weirdness phone')
+        # if to_number == '*':
+        #     app.logger.info('Outgoing broadcast call routing to volunteer')
+        #     # Cheat code * emulates a weirdness phone outgoing (calls a participant)
+        #     return outgoing_weirdness()
+        # elif to_number == '#{}'.format(UserCodeConfig.BROADCAST_TO_WEIRDNESS_CODE):
+        #     # Cheat code ## calls the weirdness phone incoming (calls outdoor phone)
+        #     app.logger.info('Routing broadcast phone to weirdness phone')
+        #     return render_xml(
+        #         'call.xml',
+        #         record=True,
+        #         timeout=40,
+        #         from_number=app.config['BROADCAST_NUMBER'],
+        #         to_sip_address='{}@{}'.format(
+        #             app.config['WEIRDNESS_SIP_USERNAME'],
+        #             app.config['TWILIO_SIP_DOMAIN'],
+        #         ))
+        # if to_number.startswith('#'):
+        #     code = UserCodeConfig.get_code_by_number(to_number[1:])
+        #     if code:  # Flip code
+        #         value = UserCodeConfig.get(code.name)
+        #         UserCodeConfig.set(code.name, not value)
+
+        #         app.logger.info('Updating code "{}" = {}'.format(code.name, not value))
+        #         message = ('{} is now {}. '.format(
+        #             code.description, 'disabled' if value else 'enabled') * 2).strip()
+        #         return render_xml('hang_up.xml', message=message, pause=1)
+
+        #     else:
+        #         app.logger.info('Invalid code {}'.format(to_number))
+        #         return render_xml('hang_up.xml', message='Invalid code. Please try again.')
+
+        # else:
+        to_number = sanitize_phone_number(to_number)
+        if to_number:
+            app.logger.info('Outgoing broadcast call dialing: {}'.format(to_number))
             return render_xml(
                 'call.xml',
                 record=True,
-                timeout=40,
+                to_number=to_number,
                 from_number=app.config['BROADCAST_NUMBER'],
-                to_sip_address='{}@{}'.format(
-                    app.config['WEIRDNESS_SIP_USERNAME'],
-                    app.config['TWILIO_SIP_DOMAIN'],
-                ))
-        if to_number.startswith('#'):
-            code = UserCodeConfig.get_code_by_number(to_number[1:])
-            if code:  # Flip code
-                value = UserCodeConfig.get(code.name)
-                UserCodeConfig.set(code.name, not value)
-
-                app.logger.info('Updating code "{}" = {}'.format(code.name, not value))
-                message = ('{} is now {}. '.format(
-                    code.description, 'disabled' if value else 'enabled') * 2).strip()
-                return render_xml('hang_up.xml', message=message, pause=1)
-
-            else:
-                app.logger.info('Invalid code {}'.format(to_number))
-                return render_xml('hang_up.xml', message='Invalid code. Please try again.')
-
-        else:
-            to_number = sanitize_phone_number(to_number)
-            if to_number:
-                app.logger.info('Outgoing broadcast call dialing: {}'.format(to_number))
-                return render_xml(
-                    'call.xml',
-                    record=True,
-                    to_number=to_number,
-                    from_number=app.config['BROADCAST_NUMBER'],
-                )
+            )
 
     # Catch-all
     app.logger.warning("Outgoing broadcast call couldn't complete: {}".format(

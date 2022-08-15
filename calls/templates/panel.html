@@ -90,7 +90,7 @@
                 }
             }).always(function() {
                 if (!notimeout) {
-                    setTimeout(updatePage, 12500);
+                    setTimeout(updatePage, 5000);
                 }
             });
         }
@@ -120,6 +120,7 @@
         </button>
     </form>
 
+    {#
     Cheat Codes:
     <ul>
         <li><code>*</code> &mdash; Call random Phone Experiment participant</li>
@@ -135,6 +136,7 @@
             {% endif %}
         {% endfor %}
     </ul>
+    #}
 
     <table>
         <thead>

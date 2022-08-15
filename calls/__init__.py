@@ -125,10 +125,13 @@ def outgoing():
             return outgoing_weirdness()
         else:
             to_number = sanitize_phone_number(to_number)
-            return render_xml(
-                'call.xml',
-                from_number=app.config['WEIRDNESS_NUMBER'],
-                to_number=to_number,
-            )
+            if to_number:
+                return render_xml(
+                    'call.xml',
+                    from_number=app.config['WEIRDNESS_NUMBER'],
+                    to_number=to_number,
+                )
+            else:
+                return render_xml('hang_up.xml', message='The number you dialed is invalid. True again.')
 
     return render_xml('hang_up.xml', message='Invalid SIP address.')
