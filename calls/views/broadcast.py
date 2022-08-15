@@ -79,7 +79,7 @@ def outgoing():
         request.values.get('To')))
     return render_xml('hang_up.xml', message=(
         'Your call cannot be completed as dialed. Please eat some cabbage, bring '
-        'in your dry cleaning and try your call again. Good bye.'))
+        'in your dry cleaning and try your call again. You probably got the number wrong. Good bye.'))
 
 
 @broadcast.route('/incoming', methods=('POST',))
