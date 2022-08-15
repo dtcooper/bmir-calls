@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Response>
      <Say>
-        Welcome to R M I B, 54 dot 9 AM.
-        Or is it B M I R 94 point 5 FM?
+        Welcome to R M I B, 54 dot 9 AM radio.
+        Or is it B M I R 94 point 5 FM radio?
         No one is available to call your take right now.
         Beep until the message to leave your please wait.
-        Message. Beep. Please leave. Or don't leave, I'm not your mother.
         At the tone. What to do, you know!
     </Say>
     <Record
