@@ -1,0 +1,14 @@
+services:
+  app:
+    restart: 'no'
+    volumes:
+      - .:/app
+    environment:
+      UVICORN_RELOAD: 1
+    ports:
+      - 8000:8000
+
+  nginx:
+    restart: 'no'
+    environment:
+      DHPARAM_SIZE: 1024  # Faster in dev

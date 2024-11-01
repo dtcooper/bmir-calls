@@ -1,0 +1,30 @@
+services:
+  app:
+    restart: always
+    volumes:
+      - ./.env:/.env:ro
+    build:
+      context: .
+      args:
+        DEBUG: "${DEBUG:-0}"
+    command: [uvicorn]
+
+  nginx:
+    restart: always
+    image: ghcr.io/dtcooper/nginx-certbot-jinja:5.4.0-nginx1.27.2
+    depends_on:
+      - app
+    volumes:
+      - ./nginx.conf.jinja:/etc/nginx/templates/site.conf.jinja
+      - ./static:/static
+      - nginx_secrets:/etc/letsencrypt
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      DEBUG: "${DEBUG}"
+      DOMAIN_NAME: "${DOMAIN_NAME}"
+      CERTBOT_EMAIL: "${CERTBOT_EMAIL}"
+
+volumes:
+  nginx_secrets:
