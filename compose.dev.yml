@@ -1,0 +1,15 @@
+services:
+  app:
+    restart: 'no'
+    volumes:
+      - .:/app
+    ports:
+      - 127.0.0.1:8000:8000
+
+  nginx:
+    restart: 'no'
+
+  db:
+    restart: 'no'
+    ports:
+      - 127.0.0.1:5432:5432

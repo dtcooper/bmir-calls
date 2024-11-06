@@ -1,0 +1,38 @@
+{% set DEBUG = true if DEBUG|int else false -%}
+
+server {
+    server_name {{ DOMAIN_NAME }};
+
+    listen 443 ssl default_server reuseport;
+    listen [::]:443 ssl default_server reuseport;
+    http2 on;
+
+    ssl_certificate /etc/letsencrypt/live/{{ DOMAIN_NAME }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ DOMAIN_NAME }}/privkey.pem;
+    ssl_trusted_certificate /etc/letsencrypt/live/{{ DOMAIN_NAME }}/chain.pem;
+    ssl_dhparam /etc/letsencrypt/dhparams/dhparam.pem;
+
+    {% if DEBUG %}
+        # Static files disabled when DEBUG=1
+    {% else %}
+        # Static files served when DEBUG=0
+        location /static/ {
+            alias /serve/static/;
+        }
+    {% endif %}
+
+    location = /favicon.ico {
+        access_log off;
+        log_not_found off;
+    }
+
+    # Otherwise, proxy to backend
+    location / {
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_redirect off;
+        proxy_pass http://app:8000;
+    }
+}
