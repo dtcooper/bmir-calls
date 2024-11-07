@@ -13,6 +13,7 @@ python-multipart = "^0.0.16"
 starlette = "^0.41.2"
 twilio = "^9.3.6"
 uvicorn = "^0.32.0"
+peewee-aio = {extras = ["aiosqlite"], version = "^2.0.0"}
 
 
 [tool.poetry.group.dev.dependencies]

@@ -3,6 +3,7 @@ services:
     restart: always
     volumes:
       - ./.env:/.env:ro
+      - sqlite_db:/db
     build:
       context: .
       args:
@@ -28,3 +29,4 @@ services:
 
 volumes:
   nginx_secrets:
+  sqlite_db:

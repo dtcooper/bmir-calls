@@ -1,10 +1,13 @@
 FROM python:3.13-bookworm
 
-ENV UVICORN_APP=bmir_calls:app \
-    UVICORN_HOST=0.0.0.0 \
+ENV POETRY_VIRTUALENVS_CREATE=false \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    POETRY_VIRTUALENVS_CREATE=false
+    UVICORN_APP=bmir_calls:app \
+    UVICORN_FORWARDED_ALLOW_IPS='*' \
+    UVICORN_HOST=0.0.0.0 \
+    UVICORN_PROXY_HEADERS=1 \
+    UVICORN_WORKERS=1
 
 ARG POETRY_VERSION=1.8.4
 RUN wget -qO - https://install.python-poetry.org | python -
@@ -27,6 +30,7 @@ RUN apt-get update \
             nano \
             netcat-openbsd \
             postgresql-client \
+            sqlite3 \
     ; fi
 
 COPY pyproject.toml poetry.lock /app/

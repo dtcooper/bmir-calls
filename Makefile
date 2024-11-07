@@ -7,7 +7,7 @@ up: .env
 
 .PHONY: shell
 shell:
-	$(COMPOSE) run --rm --service-ports app bash || exit 0
+	$(COMPOSE) run --rm --use-aliases --service-ports app bash || exit 0
 
 .PHONY: build
 build:
@@ -17,10 +17,10 @@ build:
 down:
 	$(COMPOSE) down --remove-orphans
 
-.PHONY: nginx-nodeps
-nginx-nodeps:
-	$(COMPOSE) run --no-deps --rm --service-ports nginx || true
+.PHONY: nginx-background
+nginx-background:
+	$(COMPOSE) up --no-deps --detach nginx
 
 .PHONY: lint
 lint:
-	$(COMPOSE) run --no-deps --rm app poetry run sh -c "black . ; isort . ; flake8 ." || true
+	$(COMPOSE) run --no-deps --rm app sh -c "black . ; isort . ; flake8 ." || true

@@ -9,52 +9,30 @@ from twilio.http.async_http_client import AsyncTwilioHttpClient
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client as TwilioClient
 from twilio.twiml import TwiML
-from uvicorn.logging import ColourizedFormatter
 
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse, Response
 from starlette.routing import Route
 
-from . import config
+from . import settings
 
 
-if config.DEBUG:
+if settings.DEBUG:
     import pprint
     from xml.dom.minidom import parseString as parse_xml_string
 
 
-logger = logging.getLogger("bmir-calls")
+logger = logging.getLogger(__name__)
 
 
-def __init_logger():
-    uvicorn_logger = logging.getLogger("uvicorn")
-    logger.setLevel("DEBUG" if config.DEBUG else "INFO")
-
-    for logger_to_modify in (uvicorn_logger, logger):
-        for handler in logger_to_modify.handlers:
-            logger_to_modify.removeHandler(handler)
-        handler = logging.StreamHandler()
-        formatter = ColourizedFormatter("{asctime} {levelprefix:<8} {message}", style="{")
-        handler.setFormatter(formatter)
-        logger_to_modify.addHandler(handler)
-
-
-__init_logger()
-
-
-validator = RequestValidator(config.TWILIO_AUTH_TOKEN)
-twilio_client = TwilioClient(config.TWILIO_ACCOUNT_SID, config.TWILIO_AUTH_TOKEN, http_client=AsyncTwilioHttpClient())
+validator = RequestValidator(str(settings.TWILIO_AUTH_TOKEN))
+twilio_client = TwilioClient(
+    str(settings.TWILIO_ACCOUNT_SID), str(settings.TWILIO_AUTH_TOKEN), http_client=AsyncTwilioHttpClient()
+)
 
 
 def parse_sip_address(address):
     return address.removeprefix("sip:").split("@")[0]
-
-
-def url(request: Request, name, query=None, **params):
-    url = str(request.url_for(name, **params))
-    if query is not None:
-        url = f"{url}?{urlencode(query)}"
-    return url
 
 
 class TwilioRoute(Route):
@@ -62,12 +40,11 @@ class TwilioRoute(Route):
         if methods is None:
             methods = ["POST"]
 
-        signature = inspect.signature(endpoint)
-        endpoint_kwargs_signature = {}
-        for kwarg_name, param in signature.parameters.items():
+        endpoint_signature = {}
+        for name, param in inspect.signature(endpoint).parameters.items():
             if param.annotation in (int, str, bool):
-                endpoint_kwargs_signature[kwarg_name] = (
-                    "".join(word[:1].upper() + word[1:] for word in kwarg_name.split("_")),  # camel_name
+                endpoint_signature[name] = (
+                    "".join(word[:1].upper() + word[1:] for word in name.split("_")),  # camel_name
                     param.annotation,  # type
                     param.default,  # default
                 )
@@ -83,17 +60,16 @@ class TwilioRoute(Route):
             if signature:
                 authorized = validator.validate(str(request.url), form, signature)
 
-            if not authorized and not config.DEBUG:
+            if not authorized and not settings.DEBUG:
                 logger.warning("Invalid Twilio signature header")
                 return Response(status_code=403)
 
-            if config.DEBUG_VERBOSE_REQUESTS:
+            if settings.DEBUG_VERBOSE_REQUESTS:
                 logger.debug(f"Request {authorized=} url={request.url} POST=\n{pprint.pformat(dict(form))}")
 
-            # Parse out arguments
-            kwargs = {}
+            kwargs = {}  # Parse out arguments
             form = await request.form()
-            for name, (camel_name, type, default) in endpoint_kwargs_signature.items():
+            for name, (camel_name, type, default) in endpoint_signature.items():
                 path_param = request.path_params.get(name)
                 if path_param is None:
                     value = form.get(camel_name)
@@ -125,13 +101,19 @@ class TwilioRoute(Route):
 
             if isinstance(response, TwiML):
                 twiml = str(response)
-                if config.DEBUG_VERBOSE_REQUESTS:
-                    logger.debug(f'Response XML=\n{parse_xml_string(twiml).toprettyxml(indent=" " * 4).strip()}')
+                if settings.DEBUG_VERBOSE_REQUESTS:
+                    xml = parse_xml_string(twiml).toprettyxml(indent=" " * 4).strip()
+                    logger.debug(f'Response url={request.url} XML=\n{xml}')
                 response = Response(twiml, media_type="application/xml")
 
             return response
 
         super().__init__(path, new_endpoint, methods=methods, **kwargs)
+
+
+class EmptyResponse(Response):
+    def __init__(self):
+        super().__init__(status_code=204)
 
 
 async def retry_task_on_failure(coro, *args, name=None, **kwargs):
