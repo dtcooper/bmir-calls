@@ -8,7 +8,8 @@ env = environ.Env()
 env.read_env("/.env")
 
 
-BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_DIR = Path(__file__).resolve().parent
+BASE_DIR = PROJECT_DIR.parent
 
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env.bool("DEBUG", default=False)
@@ -18,6 +19,7 @@ DOMAIN_NAME = env("DOMAIN_NAME")
 TWILIO_ACCOUNT_SID = env("TWILIO_ACCOUNT_SID")
 TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN")
 TWILIO_BROADCAST_NUMBER = env("TWILIO_BROADCAST_NUMBER")
+TWILIO_OUTGOING_NUMBER = env("TWILIO_OUTGOING_NUMBER", default=TWILIO_BROADCAST_NUMBER)
 TWILIO_QUEUE_NAME = env("TWILIO_QUEUE_NAME")
 TWILIO_SIP_DOMAIN = env("TWILIO_SIP_DOMAIN")
 TWILIO_SIP_BROADCAST_USER = env("TWILIO_SIP_BROADCAST_USER", default="broadcast")
@@ -64,7 +66,7 @@ ROOT_URLCONF = "bmir_calls.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "bmir_calls" / "templates"],  # To make base_site.html work
+        "DIRS": [PROJECT_DIR / "templates"],  # To make base_site.html work
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -140,8 +142,6 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = "/serve/media/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-SILENCED_SYSTEM_CHECKS = ("constance.E001",)
 
 CONSTANCE_CONFIG = {
     "TAKING_CALLS": (True, "Application is currently taking calls. Set to false to reject."),

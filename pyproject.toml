@@ -36,7 +36,7 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.black]
 line-length = 120
-target-version = ["py311"]
+target-version = ["py313"]
 preview = true
 enable-unstable-feature = [
     "multiline_string_handling", "string_processing", "wrap_long_dict_values_in_parens",

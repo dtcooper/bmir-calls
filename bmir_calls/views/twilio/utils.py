@@ -2,13 +2,18 @@ import logging
 from pathlib import Path
 import pprint
 import re
+from urllib.parse import urlencode
 
 from twilio.request_validator import RequestValidator
-from twilio.twiml.voice_response import Gather as TwilioGather, VoiceResponse as TwilioVoiceResponse
+from twilio.rest import Client as TwilioClient
+from twilio.twiml import TwiML
+from twilio.twiml.voice_response import Gather as BaseGather, TwiML, VoiceResponse as BaseVoiceResponse
 
 from django.conf import settings
 from django.contrib.staticfiles import finders
+from django.http import HttpResponse
 from django.templatetags.static import static
+from django.urls import reverse
 
 from constance import config
 from ninja import NinjaAPI
@@ -16,25 +21,51 @@ from ninja.parser import Parser
 from ninja.renderers import BaseRenderer
 
 
+if settings.DEBUG_VERBOSE_REQUESTS:
+    import xml.dom.minidom  # No need to import in production
+
+
+logger = logging.getLogger(__name__)
+
 underscore_converter_re = re.compile(r"(?<!^)(?=[A-Z])")
-depunctuate_words_re = re.compile(r"[^a-z]+")
-logger = logging.getLogger(f"calls.{__name__}")
+
+client = TwilioClient(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
+
+
+def parse_sip_address(address):
+    return address.removeprefix("sip:").split("@")[0]
+
+
+def generate_url_for(namespace):
+    def url_for(name, _external=False, **params):
+        url = reverse(f'twilio_{name if ":" in name else f"{namespace}:{name}"}')
+        if params:
+            url = f"{url}?{urlencode(params)}"
+        if _external:
+            url = f"https://{settings.DOMAIN_NAME}{url}"
+        return url
+
+    return url_for
+
+
+class EmptyResponse(HttpResponse):
+    def __init__(self, *args, **kwargs):
+        status = kwargs.pop("status", 204)
+        super().__init__(*args, status=status, **kwargs)
 
 
 class TwiMLRenderer(BaseRenderer):
     media_type = "text/xml"
 
-    # Accepts twilio's VoiceReponse
     def render(self, request, data, *, response_status):
-        response = str(data)
+        if isinstance(data, TwiML):
+            data = str(data)
 
-        if settings.DEBUG:
-            import xml.dom.minidom  # No need to import in production
+            if settings.DEBUG_VERBOSE_REQUESTS:
+                data = xml.dom.minidom.parseString(data).toprettyxml(indent=" " * 4).strip()
+                logger.info(f"Responding to {request.get_full_path()} with\n{data}\n")
 
-            response = xml.dom.minidom.parseString(response).toprettyxml(indent=" " * 4)
-            logger.info(f"Responding to {request.get_full_path()} with\n{response}\n")
-
-        return response
+        return data
 
 
 class TwilioParser(Parser):
@@ -50,7 +81,7 @@ class SkipTwilioPlayMixin:
         if is_media:
             full_url = url
         else:
-            full_url = f"api/twilio/sounds/{url}.mp3"
+            full_url = f"bmir_calls/twilio/sounds/{url}.mp3"
             if settings.DEBUG and not finders.find(full_url):
                 logger.warning(f"Couldn't find path for <Play /> verb: {full_url}!")
                 if settings.DEBUG:
@@ -65,11 +96,11 @@ class SkipTwilioPlayMixin:
             super().play(full_url, *args, **kwargs)
 
 
-class Gather(SkipTwilioPlayMixin, TwilioGather):
+class Gather(SkipTwilioPlayMixin, BaseGather):
     pass
 
 
-class VoiceResponse(SkipTwilioPlayMixin, TwilioVoiceResponse):
+class VoiceResponse(SkipTwilioPlayMixin, BaseVoiceResponse):
     def gather(self, *args, **kwargs) -> Gather:
         return self.nest(Gather(*args, **kwargs))
 
@@ -87,12 +118,11 @@ def twilio_auth(request):
         if not authorized:
             logger.warning("Request not properly signed from Twilio, but allowing it since DEBUG = True")
             authorized = True
+    if settings.DEBUG_VERBOSE_REQUESTS:
         logger.info(f"path={request.get_full_path()} - POST:\n{pprint.pformat(dict(request.POST))}")
-        if request.session:
-            logger.info(
-                f"path={request.get_full_path()} -"
-                f" Session:{'\n' + pprint.pformat(dict(request.session)) if dict(request.session) else ' <none>'}"
-            )
+        session = dict(request.session)
+        if session:
+            logger.info(f"path={request.get_full_path()} - Session:{'\n' + pprint.pformat(dict(session))}")
 
     return authorized
 
@@ -104,4 +134,5 @@ def create_ninja_api(name) -> NinjaAPI:
         urls_namespace=f"twilio_{name}",
         auth=twilio_auth,
         docs_url=None,
+        openapi_url=None,
     )
