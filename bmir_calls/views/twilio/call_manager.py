@@ -11,7 +11,7 @@ from django.utils.functional import classproperty
 from constance.codecs import dumps, loads
 from constance.models import Constance
 
-from ...twilio import client, create_or_find_queue
+from ...twilio import client, create_or_find_queue, get_sip_address
 
 
 logger = logging.getLogger(__name__)
@@ -156,7 +156,7 @@ class CallManager:
 
         # Not an 'elif' since we could have reset the sid from above
         if self.sid is None:
-            sip_addr = f"sip:{settings.TWILIO_SIP_BROADCAST_USER}@{settings.TWILIO_SIP_DOMAIN}"
+            sip_addr = get_sip_address(settings.TWILIO_SIP_BROADCAST_USER)
             for outgoing in (False, True):
                 for status in ("queued", "ringing", "in-progress"):
                     calls = client.calls.list(status=status, limit=1, **{"from_" if outgoing else "to": sip_addr})

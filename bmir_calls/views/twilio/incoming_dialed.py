@@ -13,7 +13,7 @@ from constance import config
 from ninja import Form
 
 from ...models import LOCATION_UNKNOWN, Voicemail
-from ...twilio import client, parse_sip_address, validate_phone_number
+from ...twilio import client, get_sip_address, parse_sip_address, validate_phone_number
 from .call_manager import CallManager, CallStatus
 from .utils import EmptyResponse, Gather, VoiceResponse, create_ninja_api, generate_url_for
 
@@ -33,18 +33,11 @@ HOLD_TRACKS = tuple(
 )
 
 
-def queue_dial_twiml():
-    response = VoiceResponse()
-    dial: Dial = response.dial(timeout=15)
-    dial.queue(settings.TWILIO_QUEUE_NAME)
-    return response
-
-
 @api.post("/call-outgoing/")
 def call_outgoing(request):
     response = VoiceResponse()
     dial: Dial = response.dial(answer_on_bridge=True)
-    dial.sip(f"sip:{settings.TWILIO_SIP_OUTGOING_USER}@{settings.TWILIO_SIP_DOMAIN}")
+    dial.sip(get_sip_address(settings.TWILIO_SIP_OUTGOING_USER))
     return response
 
 
@@ -81,13 +74,15 @@ def waiting_room(
     first_in_queue = queue_position == 1
     if call_placed := (first_in_queue and manager.status == CallStatus.AVAILABLE):
         logger.info("Broadcast phone seems available, placing outgoing call to it from waiting room.")
+        twiml_response = VoiceResponse()
+        twiml_dial: Dial = twiml_response.dial(timeout=15)
+        twiml_dial.queue(settings.TWILIO_QUEUE_NAME)
         placed_call = client.calls.create(
-            to=f"sip:{settings.TWILIO_SIP_BROADCAST_USER}@{settings.TWILIO_SIP_DOMAIN}",
+            to=get_sip_address(settings.TWILIO_SIP_BROADCAST_USER),
             from_=parse_sip_address(caller),
             timeout=BROADCAST_OUTGOING_CALL_FROM_QUEUE_TIMEOUT,
-            twiml=queue_dial_twiml(),
+            twiml=twiml_response,
             status_callback=url_for("broadcast_call_status_callback", _external=True),
-            status_callback_event=["answered", "completed"],
         )
         manager.set_status(CallStatus.INCOMING, sid=placed_call.sid)
         call_count += 1
@@ -124,9 +119,7 @@ def waiting_room(
 def broadcast_call_status_callback(request, call_sid: Form[str], call_status: Form[str]):
     manager = CallManager()
 
-    if call_status in ("answered", "in-progress"):
-        manager.set_status(CallStatus.INCOMING, sid=call_sid)
-    elif call_status in ("no-answer", "busy", "rejected"):
+    if call_status in ("no-answer", "busy", "rejected"):
         if manager.status == CallStatus.AVAILABLE:
             logger.warning("Call manager not in connected status when busy/no-answer/rejected. Forcing a validation.")
             manager.validate_from_server()

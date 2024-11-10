@@ -15,6 +15,10 @@ def parse_sip_address(address):
     return address.removeprefix("sip:").split("@")[0]
 
 
+def get_sip_address(address):
+    return f"sip:{address}@{settings.TWILIO_SIP_DOMAIN}"
+
+
 def validate_phone_number(number):
     lookup = client.lookups.v2.phone_numbers(number).fetch()
     if lookup.valid:
