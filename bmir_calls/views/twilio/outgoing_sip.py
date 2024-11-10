@@ -6,7 +6,9 @@ from django.conf import settings
 
 from ninja import Form
 
-from .utils import EmptyResponse, VoiceResponse, client, create_ninja_api, generate_url_for, parse_sip_address
+from ...twilio import parse_sip_address, validate_phone_number
+from .manager import CallManager, CallStatus
+from .utils import EmptyResponse, VoiceResponse, create_ninja_api, generate_url_for
 
 
 api = create_ninja_api("outgoing")
@@ -23,6 +25,8 @@ def call(request, caller: Form[str], called: Form[str], call_sid: Form[str]):
     called = parse_sip_address(called)
 
     if caller == settings.TWILIO_SIP_BROADCAST_USER:
+        manager = CallManager()
+        manager.set_status(CallStatus.OUTGOING, call_sid=call_sid)
         caller_id = settings.TWILIO_BROADCAST_NUMBER
 
     elif caller == settings.TWILIO_SIP_OUTGOING_USER:
@@ -42,18 +46,31 @@ def call(request, caller: Form[str], called: Form[str], call_sid: Form[str]):
             called = f"+{called.removeprefix(prefix)}"
             break
 
-    lookup = client.lookups.v2.phone_numbers(called).fetch()
-    if lookup.valid:
-        logger.info(f"Dialing {called} (caller ID = {caller_id})")
-        dial: Dial = response.dial(caller_id=caller_id)
-        dial.number(lookup.phone_number)
+    number = validate_phone_number(called)
+    if number is not None:
+        logger.info(f"Dialing {number} (caller ID = {caller_id})")
+        dial: Dial = response.dial(caller_id=caller_id, answer_on_bridge=True)
+        dial.number(number)
     else:
-        logger.warning(f'Invalid outgoing number {called}: {", ".join(lookup.validation_errors)}')
         response.play("call-cannot-be-completed")
 
     return response
 
 
 @api.post("/status/")
-def broadcast_call_status_callback(request, call_status: Form[str], caller: Form[str]):
+def broadcast_call_status_callback(request, call_sid: Form[str], call_status: Form[str], caller: Form[str]):
+    caller = parse_sip_address(caller)
+
+    # SIP Domains only provide call completed callbacks, however let's check just to be sure
+    if caller == settings.TWILIO_SIP_BROADCAST_USER and call_status not in (
+        "initiated",
+        "ringing",
+        "answered",
+        "in-progress",
+    ):
+        manager = CallManager()
+        if manager.status in (CallStatus.RINGING, CallStatus.OUTGOING, CallStatus.CONNECTED):
+            if manager.call_sid != call_sid:
+                logger.warning("Got unexpected call in progress SID!")
+            manager.set_status(CallStatus.AVAILABLE)
     return EmptyResponse()

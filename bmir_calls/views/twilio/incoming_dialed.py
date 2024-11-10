@@ -1,15 +1,21 @@
+import datetime
 import logging
+from pathlib import Path
 import random
 
-from twilio.twiml.voice_response import Dial, Gather
+import requests
+from twilio.twiml.voice_response import Dial
 
 from django.conf import settings
+from django.core.files.base import ContentFile
 
+from constance import config
 from ninja import Form
 
-from ... import constants
+from ...models import LOCATION_UNKNOWN, Voicemail
+from ...twilio import client, parse_sip_address, validate_phone_number
 from .manager import CallManager, CallStatus
-from .utils import EmptyResponse, VoiceResponse, client, create_ninja_api, generate_url_for, parse_sip_address
+from .utils import EmptyResponse, Gather, VoiceResponse, create_ninja_api, generate_url_for
 
 
 api = create_ninja_api("incoming")
@@ -18,11 +24,41 @@ url_for = generate_url_for("incoming")
 logger = logging.getLogger(__name__)
 
 
-@api.post("/")
-def call(request):
+RINGBACK_PAUSE_AMOUNT = 4
+BROADCAST_OUTGOING_CALL_FROM_QUEUE_TIMEOUT = 45
+HOLD_TRACKS = tuple(
+    p.stem
+    for p in (Path(__file__).parent.parent.parent / "static" / "bmir_calls" / "twilio" / "sounds").iterdir()
+    if p.suffix == ".mp3" and p.stem.startswith("hold-music-")
+)
+
+
+def queue_dial_twiml():
     response = VoiceResponse()
+    dial: Dial = response.dial(timeout=15)
+    dial.queue(settings.TWILIO_QUEUE_NAME)
+    return response
+
+
+@api.post("/call-outgoing/")
+def call_outgoing(request):
+    response = VoiceResponse()
+    dial: Dial = response.dial(answer_on_bridge=True)
+    dial.sip(f"sip:{settings.TWILIO_SIP_OUTGOING_USER}@{settings.TWILIO_SIP_DOMAIN}")
+    return response
+
+
+@api.post("/")
+def call(request, called: Form[str]):
+    response = VoiceResponse()
+    called = parse_sip_address(called)
     response.play("welcome")
-    response.enqueue(name=settings.TWILIO_QUEUE_NAME, action=url_for("left_queue"), wait_url=url_for("waiting_room"))
+    if config.TAKING_CALLS:
+        response.enqueue(
+            name=settings.TWILIO_QUEUE_NAME, action=url_for("left_queue"), wait_url=url_for("waiting_room")
+        )
+    else:
+        response.redirect(url_for("voicemail"))
     return response
 
 
@@ -33,7 +69,7 @@ def waiting_room(
     caller: Form[str],
     queue_position: Form[int],
     queue_time: Form[int],
-    digits: str = None,
+    digits: Form[str] = None,
     call_count: int = 0,  # Number of calls placed when 1st in queue
 ):
     response = VoiceResponse()
@@ -47,14 +83,11 @@ def waiting_room(
     should_place_call = queue_position == 1 and manager.status == CallStatus.AVAILABLE
     if should_place_call:
         logger.info("Broadcast phone seems available, placing outgoing call to it from waiting room.")
-        placed_call_twiml = VoiceResponse()
-        placed_call_dial: Dial = placed_call_twiml.dial()
-        placed_call_dial.queue(settings.TWILIO_QUEUE_NAME)
         placed_call = client.calls.create(
             to=f"sip:{settings.TWILIO_SIP_BROADCAST_USER}@{settings.TWILIO_SIP_DOMAIN}",
             from_=parse_sip_address(caller),
-            timeout=constants.BROADCAST_OUTGOING_CALL_FROM_QUEUE_TIMEOUT,
-            twiml=placed_call_dial,
+            timeout=BROADCAST_OUTGOING_CALL_FROM_QUEUE_TIMEOUT,
+            twiml=queue_dial_twiml(),
             status_callback=url_for("broadcast_call_status_callback", _external=True),
             status_callback_event=["answered", "completed"],
         )
@@ -68,11 +101,11 @@ def waiting_room(
     if (call_count == 1 or (call_count > 1 and not should_place_call)) and manager.status == CallStatus.RINGING:
         if call_count > 1:
             gather.play("ringback")
-            gather.pause(constants.RINGBACK_PAUSE_AMOUNT)
+            gather.pause(RINGBACK_PAUSE_AMOUNT)
             response.append(gather)
         else:
             response.play("ringback")
-            response.pause(constants.RINGBACK_PAUSE_AMOUNT)
+            response.pause(RINGBACK_PAUSE_AMOUNT)
             response.redirect(action)
 
     else:
@@ -81,7 +114,7 @@ def waiting_room(
         #     gather.play(static("hold-next.mp3"))
         # else:
         #     gather.play(static())
-        gather.play(random.choice(constants.HOLD_TRACKS))
+        gather.play(random.choice(HOLD_TRACKS))
         gather.say(f"Music queue position: position {queue_position} and {queue_time} seconds")
         gather.pause(1)
         response.append(gather)
@@ -89,22 +122,98 @@ def waiting_room(
     return response
 
 
+@api.post("/broadcast/status/")
+def broadcast_call_status_callback(request, call_sid: Form[str], call_status: Form[str]):
+    manager = CallManager()
+
+    if call_status in ("answered", "in-progress"):
+        manager.set_status(CallStatus.CONNECTED, call_sid=call_sid)
+    elif call_status in ("no-answer", "busy", "rejected"):
+        if manager.status == CallStatus.AVAILABLE:
+            logger.warning("Call manager not in connected status when busy/no-answer/rejected. Forcing a validation.")
+            manager.validate_from_server()
+    elif call_status == "completed":
+        manager.set_status(CallStatus.AVAILABLE)
+
+    return EmptyResponse()
+
+
 @api.post("/left-queue/")
-def left_queue(request):
+def left_queue(request, queue_result: Form[str]):
     response = VoiceResponse()
-    response.hangup()
+
+    if queue_result == "leave" or queue_result == "queue-full":
+        response.redirect("voicemail")
+    elif queue_result == "hangup":
+        manager = CallManager()
+        manager.validate_from_server()
+        response.hangup()
+    elif queue_result == "bridged":
+        response.play("fun-music")
+        response.hangup()
+    else:
+        logger.warning(f"Got unexpected left queue result: {queue_result}")
+        response.hangup()
+
     return response
 
 
-@api.post("/broadcast/status/")
-def broadcast_call_status_callback(request, call_sid: Form[str], call_status: Form[str]):
-    # logger.debug(f"Got broadcast status={call_status} callback, {caller} => {called}, {call_sid=}")
+@api.post("/voicemail/")
+def voicemail(
+    request,
+    caller: Form[str],
+    digits: Form[str] = None,
+    caller_city: Form[str] = None,
+    caller_state: Form[str] = None,
+    caller_country: Form[str] = None,
+):
+    response = VoiceResponse()
 
-    # if call_status in ("answered", "in-progress"):
-    #     manager.update_broadcast_call(call_sid=call_sid, call_status=CallStatus.CONNECTED)
-    # elif call_status in ("no-answer", "busy", "rejected"):
-    #     await manager.reject_incoming_broadcast_call()
-    # elif call_status == "completed":
-    #     manager.hangup_broadcast_call()
+    if digits:
+        if digits == "#":
+            response.play("voicemail/erased")
+        else:
+            response.play("voicemail/goodbye")
+            response.play("fun-music")
+            response.hangup()
+            return response
+
+    response.play("voicemail/instructions")
+    response.play("beep")
+
+    caller_id = validate_phone_number(parse_sip_address(caller)) or ""
+    location = ", ".join(s for s in (caller_city, caller_state, caller_country) if s) or LOCATION_UNKNOWN
+
+    response.record(
+        timeout=15,
+        max_length=60 * 5,  # 5 minutes
+        recording_status_callback=url_for("voicemail_status_callback", caller_id=caller_id, location=location),
+        play_beep=False,
+    )
+
+    return response
+
+
+@api.post("/voicemail/status/")
+def voicemail_status_callback(
+    request,
+    recording_sid: Form[str],
+    recording_url: Form[str],
+    recording_duration: Form[int],
+    location: str,
+    caller_id: str = "",
+):
+    recording = requests.get(f"{recording_url}.mp3")
+    Voicemail.objects.create(
+        phone_number=caller_id,
+        location=location,
+        duration=datetime.timedelta(seconds=recording_duration),
+        file=ContentFile(recording.content, name=f"{recording_sid}.mp3"),
+    )
+
+    # logger.info(f"Deleting recording {recording_sid}.")
+    if config.DELETE_RECORDINGS_FROM_TWILIO_AFTER_DOWNLOAD:
+        logger.info(f"Removing downloaded recording {recording_sid} from Twilio.")
+        client.recordings(recording_sid).delete()
 
     return EmptyResponse()

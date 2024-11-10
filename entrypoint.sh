@@ -21,8 +21,8 @@ fi
 cd "$(dirname "$0")"
 
 wait-for-it --timeout 0 --service db:5432
-
 ./manage.py migrate
+
 
 if [ "$DEBUG" ]; then
     if [ "$(./manage.py shell -c 'from django.contrib.auth.models import User; print("" if User.objects.exists() else "1")')" = 1 ]; then
@@ -35,14 +35,11 @@ if [ "$DEBUG" ]; then
 fi
 
 if [ "$#" = 0 ]; then
-    if [ -z "$DEBUG" ]; then
-        # Do this in the background
-        ./manage.py collectstatic --noinput &
-    fi
-
     if [ "$DEBUG" ]; then
         exec ./manage.py runserver
     else
+        ./manage.py collectstatic --noinput &
+
         if [ -z "$NUM_GUNICORN_WORKERS" ]; then
             # num_cpus * 2 + 1 workers
             NUM_GUNICORN_WORKERS="$(python -c 'import multiprocessing as m; print(m.cpu_count() * 2 + 1)')"

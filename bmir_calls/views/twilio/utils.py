@@ -5,8 +5,6 @@ import re
 from urllib.parse import urlencode
 
 from twilio.request_validator import RequestValidator
-from twilio.rest import Client as TwilioClient
-from twilio.twiml import TwiML
 from twilio.twiml.voice_response import Gather as BaseGather, TwiML, VoiceResponse as BaseVoiceResponse
 
 from django.conf import settings
@@ -28,12 +26,6 @@ if settings.DEBUG_VERBOSE_REQUESTS:
 logger = logging.getLogger(__name__)
 
 underscore_converter_re = re.compile(r"(?<!^)(?=[A-Z])")
-
-client = TwilioClient(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
-
-
-def parse_sip_address(address):
-    return address.removeprefix("sip:").split("@")[0]
 
 
 def generate_url_for(namespace):

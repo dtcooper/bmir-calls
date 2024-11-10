@@ -21,6 +21,7 @@ TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN")
 TWILIO_BROADCAST_NUMBER = env("TWILIO_BROADCAST_NUMBER")
 TWILIO_OUTGOING_NUMBER = env("TWILIO_OUTGOING_NUMBER", default=TWILIO_BROADCAST_NUMBER)
 TWILIO_QUEUE_NAME = env("TWILIO_QUEUE_NAME")
+TWILIO_QUEUE_MAX_SIZE = env.int("TWILIO_QUEUE_MAX_SIZE", default=15)
 TWILIO_SIP_DOMAIN = env("TWILIO_SIP_DOMAIN")
 TWILIO_SIP_BROADCAST_USER = env("TWILIO_SIP_BROADCAST_USER", default="broadcast")
 TWILIO_SIP_OUTGOING_USER = env("TWILIO_SIP_OUTGOING_USER", default="outgoing")
@@ -119,11 +120,6 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
-        "huey": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
         "bmir_calls": {
             "handlers": ["console"],
             "level": "INFO",
@@ -143,19 +139,19 @@ MEDIA_ROOT = "/serve/media/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CONSTANCE_CONFIG = {
-    "TAKING_CALLS": (True, "Application is currently taking calls. Set to false to reject."),
-}
-
-if DEBUG:
-    CONSTANCE_CONFIG.update({
-        "SKIP_TWILIO_PLAY": (False, "Skip Twilio <Play /> verb, just use <Say /> verb instead"),
-    })
-
-CONSTANCE_CONFIG_FIELDSETS = OrderedDict((("General settings", ("TAKING_CALLS",)),))
-if DEBUG:
-    CONSTANCE_CONFIG_FIELDSETS["Debug settings"] = ("SKIP_TWILIO_PLAY",)
-
 CONSTANCE_BACKEND = "constance.backends.database.DatabaseBackend"
+CONSTANCE_CONFIG = OrderedDict((
+    ("TAKING_CALLS", (True, "Application is currently taking calls. Set to false to reject and send to voicemail")),
+    ("DELETE_RECORDINGS_FROM_TWILIO_AFTER_DOWNLOAD", (True, "Remove recordings from Twilio's API after download")),
+))
 
-SHELL_PLUS_IMPORTS = ("from constance import config",)
+if DEBUG:
+    CONSTANCE_CONFIG.update(
+        OrderedDict((("SKIP_TWILIO_PLAY", (False, "Skip Twilio <Play /> verb, just use <Say /> verb instead")),))
+    )
+
+SHELL_PLUS_IMPORTS = (
+    "from constance import config",
+    "from bmir_calls.twilio import client",
+    "from bmir_calls.views.twilio.manager import CallManager",
+)

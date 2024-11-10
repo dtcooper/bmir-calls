@@ -13,9 +13,13 @@ server {
     ssl_dhparam /etc/letsencrypt/dhparams/dhparam.pem;
 
     {% if DEBUG %}
-        # Static files disabled when DEBUG=1
+        # Static/media files disabled when DEBUG=1
     {% else %}
-        # Static files served when DEBUG=0
+        # Static/media files served when DEBUG=0
+        location /media/ {
+            alias /serve/media/;
+        }
+
         location /static/ {
             alias /serve/static/;
         }
