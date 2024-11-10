@@ -7,7 +7,7 @@ from django.conf import settings
 from ninja import Form
 
 from ...twilio import parse_sip_address, validate_phone_number
-from .manager import CallManager, CallStatus
+from .call_manager import CallManager, CallStatus
 from .utils import EmptyResponse, VoiceResponse, create_ninja_api, generate_url_for
 
 
@@ -26,7 +26,7 @@ def call(request, caller: Form[str], called: Form[str], call_sid: Form[str]):
 
     if caller == settings.TWILIO_SIP_BROADCAST_USER:
         manager = CallManager()
-        manager.set_status(CallStatus.OUTGOING, call_sid=call_sid)
+        manager.set_status(CallStatus.OUTGOING, sid=call_sid)
         caller_id = settings.TWILIO_BROADCAST_NUMBER
 
     elif caller == settings.TWILIO_SIP_OUTGOING_USER:
@@ -69,8 +69,8 @@ def broadcast_call_status_callback(request, call_sid: Form[str], call_status: Fo
         "in-progress",
     ):
         manager = CallManager()
-        if manager.status in (CallStatus.RINGING, CallStatus.OUTGOING, CallStatus.CONNECTED):
-            if manager.call_sid != call_sid:
+        if manager.status != CallStatus.AVAILABLE:
+            if manager.sid != call_sid:
                 logger.warning("Got unexpected call in progress SID!")
             manager.set_status(CallStatus.AVAILABLE)
     return EmptyResponse()

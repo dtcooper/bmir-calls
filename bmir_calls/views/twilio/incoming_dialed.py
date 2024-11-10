@@ -14,7 +14,7 @@ from ninja import Form
 
 from ...models import LOCATION_UNKNOWN, Voicemail
 from ...twilio import client, parse_sip_address, validate_phone_number
-from .manager import CallManager, CallStatus
+from .call_manager import CallManager, CallStatus
 from .utils import EmptyResponse, Gather, VoiceResponse, create_ninja_api, generate_url_for
 
 
@@ -65,7 +65,6 @@ def call(request, called: Form[str]):
 @api.post("/waiting-room/")
 def waiting_room(
     request,
-    call_sid: Form[str],
     caller: Form[str],
     queue_position: Form[int],
     queue_time: Form[int],
@@ -78,10 +77,9 @@ def waiting_room(
         response.leave()
         return response
 
-    # should_place_call = queue_position == 1 and manager.call_status == CallStatus.AVAILABLE
     manager = CallManager()
-    should_place_call = queue_position == 1 and manager.status == CallStatus.AVAILABLE
-    if should_place_call:
+    first_in_queue = queue_position == 1
+    if call_placed := (first_in_queue and manager.status == CallStatus.AVAILABLE):
         logger.info("Broadcast phone seems available, placing outgoing call to it from waiting room.")
         placed_call = client.calls.create(
             to=f"sip:{settings.TWILIO_SIP_BROADCAST_USER}@{settings.TWILIO_SIP_DOMAIN}",
@@ -91,14 +89,14 @@ def waiting_room(
             status_callback=url_for("broadcast_call_status_callback", _external=True),
             status_callback_event=["answered", "completed"],
         )
-        manager.set_status(CallStatus.RINGING, call_sid=placed_call.sid, ringing_sid=call_sid)
+        manager.set_status(CallStatus.INCOMING, sid=placed_call.sid)
         call_count += 1
 
     action = url_for("waiting_room", query={"call_count": call_count})
     gather = Gather(action=action, num_digits=1, action_on_empty_result=True, timeout=0, finish_on_key="")
 
-    # Fall through on second placed call
-    if (call_count == 1 or (call_count > 1 and not should_place_call)) and manager.status == CallStatus.RINGING:
+    # Fall through to recording on second placed call
+    if first_in_queue and (call_count == 1 or (call_count > 1 and not call_placed)):
         if call_count > 1:
             gather.play("ringback")
             gather.pause(RINGBACK_PAUSE_AMOUNT)
@@ -127,7 +125,7 @@ def broadcast_call_status_callback(request, call_sid: Form[str], call_status: Fo
     manager = CallManager()
 
     if call_status in ("answered", "in-progress"):
-        manager.set_status(CallStatus.CONNECTED, call_sid=call_sid)
+        manager.set_status(CallStatus.INCOMING, sid=call_sid)
     elif call_status in ("no-answer", "busy", "rejected"):
         if manager.status == CallStatus.AVAILABLE:
             logger.warning("Call manager not in connected status when busy/no-answer/rejected. Forcing a validation.")
@@ -143,7 +141,7 @@ def left_queue(request, queue_result: Form[str]):
     response = VoiceResponse()
 
     if queue_result == "leave" or queue_result == "queue-full":
-        response.redirect("voicemail")
+        response.redirect(url_for("voicemail"))
     elif queue_result == "hangup":
         manager = CallManager()
         manager.validate_from_server()

@@ -153,5 +153,5 @@ if DEBUG:
 SHELL_PLUS_IMPORTS = (
     "from constance import config",
     "from bmir_calls.twilio import client",
-    "from bmir_calls.views.twilio.manager import CallManager",
+    "from bmir_calls.views.twilio.call_manager import CallManager",
 )
