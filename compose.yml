@@ -13,7 +13,7 @@ services:
       - ./serve:/serve
 
   nginx:
-    image: ghcr.io/dtcooper/nginx-certbot-jinja:5.4.0-nginx1.27.2
+    image: ghcr.io/dtcooper/nginx-certbot-jinja:5.4.0-nginx1.27.2-alpine
     restart: always
     depends_on:
       - app
@@ -38,6 +38,5 @@ services:
       POSTGRES_PASSWORD: postgres
 
 volumes:
-
   nginx_secrets: {}
   postgres_data: {}
