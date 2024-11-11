@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import random
 
+from num2words import num2words
 import requests
 from twilio.twiml.voice_response import Dial
 
@@ -26,11 +27,13 @@ logger = logging.getLogger(__name__)
 
 RINGBACK_PAUSE_AMOUNT = 4
 BROADCAST_OUTGOING_CALL_FROM_QUEUE_TIMEOUT = 45
-HOLD_TRACKS = tuple(
-    p.stem
-    for p in (Path(__file__).parent.parent.parent / "static" / "bmir_calls" / "twilio" / "sounds").iterdir()
-    if p.suffix == ".mp3" and p.stem.startswith("hold-music-")
-)
+SOUNDS_DIR = Path(__file__).parent.parent.parent / "static" / "bmir_calls" / "twilio" / "sounds"
+HOLD_TRACKS = tuple(p.stem for p in SOUNDS_DIR.iterdir() if p.suffix == ".mp3" and p.stem.startswith("hold-music-"))
+QUEUE_POSITION_TRACKS = {
+    int(p.stem): f"queue-position/{p.stem}"
+    for p in (SOUNDS_DIR / "queue-position").iterdir()
+    if p.suffix == ".mp3" and p.stem.isdigit()
+}
 
 
 @api.post("/call-outgoing/")
@@ -51,6 +54,7 @@ def call(request, called: Form[str]):
             name=settings.TWILIO_QUEUE_NAME, action=url_for("left_queue"), wait_url=url_for("waiting_room")
         )
     else:
+        response.play("not-taking-calls")
         response.redirect(url_for("voicemail"))
     return response
 
@@ -66,8 +70,8 @@ def waiting_room(
 ):
     response = VoiceResponse()
 
-    if digits == "*":
-        response.leave()
+    if digits == "*" or queue_time > settings.TWILIO_QUEUE_MAX_WAIT_TIME:
+        response.leave()  # Leaving goes to Voicemail
         return response
 
     manager = CallManager()
@@ -87,7 +91,7 @@ def waiting_room(
         manager.set_status(CallStatus.INCOMING, sid=placed_call.sid)
         call_count += 1
 
-    action = url_for("waiting_room", query={"call_count": call_count})
+    action = url_for("waiting_room", call_count=call_count)
     gather = Gather(action=action, num_digits=1, action_on_empty_result=True, timeout=0, finish_on_key="")
 
     # Fall through to recording on second placed call
@@ -102,21 +106,28 @@ def waiting_room(
             response.redirect(action)
 
     else:
-        gather.play("attempting-to-connect")
-        # if queue_position == 1:
-        #     gather.play(static("hold-next.mp3"))
-        # else:
-        #     gather.play(static())
-        gather.play(random.choice(HOLD_TRACKS))
-        gather.say(f"Music queue position: position {queue_position} and {queue_time} seconds")
-        gather.pause(1)
+        if call_count >= 1:
+            gather.play("queue-position/ringing")
+        else:
+            gather.play("attempting-to-connect")
+
+        gather.play("queue-instructions")
+
+        if call_count == 0:
+            asset = QUEUE_POSITION_TRACKS.get(queue_position)
+            if asset is None:
+                gather.play("queue-position/generic")
+                gather.say(f'{num2words(queue_position, to="ordinal").replace("-", " ").capitalize()}.')
+            else:
+                gather.play(asset)
+            gather.play(random.choice(HOLD_TRACKS))
         response.append(gather)
 
     return response
 
 
 @api.post("/broadcast/status/")
-def broadcast_call_status_callback(request, call_sid: Form[str], call_status: Form[str]):
+def broadcast_call_status_callback(request, call_status: Form[str]):
     manager = CallManager()
 
     if call_status in ("no-answer", "busy", "rejected"):
@@ -135,17 +146,17 @@ def left_queue(request, queue_result: Form[str]):
 
     if queue_result == "leave" or queue_result == "queue-full":
         response.redirect(url_for("voicemail"))
+        return response  # Avoid hangup as below
     elif queue_result == "hangup":
         manager = CallManager()
         manager.validate_from_server()
-        response.hangup()
+
     elif queue_result == "bridged":
         response.play("fun-music")
-        response.hangup()
     else:
         logger.warning(f"Got unexpected left queue result: {queue_result}")
-        response.hangup()
 
+    response.hangup()
     return response
 
 
@@ -161,15 +172,12 @@ def voicemail(
     response = VoiceResponse()
 
     if digits:
-        if digits == "#":
-            response.play("voicemail/erased")
-        else:
-            response.play("voicemail/goodbye")
-            response.play("fun-music")
-            response.hangup()
-            return response
+        response.play("goodbye")
+        response.play("fun-music")
+        response.hangup()
+        return response
 
-    response.play("voicemail/instructions")
+    response.play("voicemail-instructions")
     response.play("beep")
 
     caller_id = validate_phone_number(parse_sip_address(caller)) or ""

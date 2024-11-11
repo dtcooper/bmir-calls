@@ -536,6 +536,16 @@ phonenumbers = ["phonenumbers (>=7.0.2)"]
 phonenumberslite = ["phonenumberslite (>=7.0.2)"]
 
 [[package]]
+name = "docopt"
+version = "0.6.2"
+description = "Pythonic argument parser, that will make you smile"
+optional = false
+python-versions = "*"
+files = [
+    {file = "docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491"},
+]
+
+[[package]]
 name = "executing"
 version = "2.1.0"
 description = "Get the currently executing AST node of a frame, and other information"
@@ -921,6 +931,20 @@ files = [
     {file = "mypy_extensions-1.0.0-py3-none-any.whl", hash = "sha256:4392f6c0eb8a5668a69e23d168ffa70f0be9ccfd32b5cc2d26a34ae5b844552d"},
     {file = "mypy_extensions-1.0.0.tar.gz", hash = "sha256:75dbf8955dc00442a438fc4d0666508a9a97b6bd41aa2f0ffe9d2f2725af0782"},
 ]
+
+[[package]]
+name = "num2words"
+version = "0.5.13"
+description = "Modules to convert numbers to words. Easily extensible."
+optional = false
+python-versions = "*"
+files = [
+    {file = "num2words-0.5.13-py3-none-any.whl", hash = "sha256:39e662c663f0a7e15415431ea68eb3dc711b49e3b776d93403e1da0a219ca4ee"},
+    {file = "num2words-0.5.13.tar.gz", hash = "sha256:a3064716fbbf90d75c449450cebfbc73a6a13e63b2531d09bdecc3ab1a2209cf"},
+]
+
+[package.dependencies]
+docopt = ">=0.6.2"
 
 [[package]]
 name = "packaging"
@@ -1625,4 +1649,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "1af95c7b1869df3ced03879bfce4a71efebaac6ed7a79186b1e4eedbe1080f99"
+content-hash = "b12e44959469a4e6834c34cbbb8702de1d854c108f9bc5c9841ce62d4536e81c"

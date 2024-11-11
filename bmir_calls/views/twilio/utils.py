@@ -1,7 +1,9 @@
 import logging
 from pathlib import Path
 import pprint
+import random
 import re
+import string
 from urllib.parse import urlencode
 
 from twilio.request_validator import RequestValidator
@@ -85,6 +87,8 @@ class SkipTwilioPlayMixin:
         else:
             if _external:
                 full_url = f"https://{settings.DOMAIN_NAME}{full_url}"
+            if settings.DEBUG:  # Make sure Twilio doesn't cache assets when DEBUG = True
+                full_url += f"?debug_cache_buster={''.join(random.choice(string.ascii_letters) for _ in range(8))}"
             super().play(full_url, *args, **kwargs)
 
 
