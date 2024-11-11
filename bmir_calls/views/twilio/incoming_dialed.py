@@ -185,7 +185,7 @@ def voicemail(
 
     response.record(
         timeout=15,
-        max_length=60 * 5,  # 5 minutes
+        max_length=150,  # 2.5 minutes
         recording_status_callback=url_for("voicemail_status_callback", caller_id=caller_id, location=location),
         play_beep=False,
     )

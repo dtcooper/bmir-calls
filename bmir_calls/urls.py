@@ -8,6 +8,9 @@ from django.urls import include, path
 from .views.twilio import incoming_dialed_api, outgoing_sip_api
 
 
+admin.site.site_title = admin.site.site_header = "BMIR Calls"
+
+
 def index(request):
     if request.user.is_staff:
         return redirect("admin:index")
