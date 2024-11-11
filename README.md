@@ -32,7 +32,7 @@ On your SIP Domain, configure as follows
   * `A call comes in` &mdash; Set a Webhook to
     `https://<DOMAIN_NAME>/twilio/outgoing/` (HTTP POST)
   * `Call status changes` &mdash; Set to
-    `<DOMAIN_NAME>/twilio/outgoing/status/` (HTTP POST)
+    `https://<DOMAIN_NAME>/twilio/outgoing/status/` (HTTP POST)
 * **Secure Media** set to disabled.
 * Under **SIP Registration**,
   * `Endpoints CAN register with this Domain` &mdash; Set to enabled
