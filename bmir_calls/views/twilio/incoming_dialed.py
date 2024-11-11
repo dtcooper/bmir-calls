@@ -106,11 +106,7 @@ def waiting_room(
             response.redirect(action)
 
     else:
-        if call_count >= 1:
-            gather.play("queue-position/ringing")
-        else:
-            gather.play("attempting-to-connect")
-
+        gather.play("queue-position/ringing" if call_count >= 1 else "attempting-to-connect")
         gather.play("queue-instructions")
 
         if call_count == 0:
@@ -210,7 +206,6 @@ def voicemail_status_callback(
         file=ContentFile(recording.content, name=f"{recording_sid}.mp3"),
     )
 
-    # logger.info(f"Deleting recording {recording_sid}.")
     if config.DELETE_RECORDINGS_FROM_TWILIO_AFTER_DOWNLOAD:
         logger.info(f"Removing downloaded recording {recording_sid} from Twilio.")
         client.recordings(recording_sid).delete()

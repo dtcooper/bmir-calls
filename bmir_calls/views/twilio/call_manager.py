@@ -6,12 +6,11 @@ from twilio.base.exceptions import TwilioRestException
 
 from django.conf import settings
 from django.utils import timezone
-from django.utils.functional import classproperty
 
 from constance.codecs import dumps, loads
 from constance.models import Constance
 
-from ...twilio import client, create_or_find_queue, get_sip_address
+from ...twilio import client, get_sip_address
 
 
 logger = logging.getLogger(__name__)
@@ -45,7 +44,6 @@ def delete_db_value(key):
 
 
 class CallManager:
-    _queue = None
 
     def __init__(self, *, initialize=False):
         self._initialized: bool = False
@@ -71,12 +69,6 @@ class CallManager:
     def _delete():
         for key in (CONFIG_DB_KEY, NEXT_VALIDATION_DB_KEY):
             delete_db_value(key)
-
-    @classproperty
-    def queue(cls):
-        if cls._queue is None:
-            cls._queue = create_or_find_queue(settings.TWILIO_QUEUE_NAME)
-        return cls._queue
 
     @property
     def status(self) -> CallStatus:
