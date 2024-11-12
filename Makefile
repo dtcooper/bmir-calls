@@ -13,7 +13,7 @@ shell:
 
 .PHONY: shell-nodeps
 shell-nodeps:
-	$(COMPOSE) run --no-deps --rm --entrypoint /bin/bash backend || true
+	$(COMPOSE) run --no-deps --rm --entrypoint /bin/bash app || true
 
 .PHONY: build
 build:

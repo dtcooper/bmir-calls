@@ -137,10 +137,12 @@ def broadcast_call_status_callback(request, call_status: Form[str]):
 
 
 @api.post("/left-queue/")
-def left_queue(request, queue_result: Form[str]):
+def left_queue(request, queue_result: Form[str], queue_time: Form[int] = 0):
     response = VoiceResponse()
 
-    if queue_result == "leave" or queue_result == "queue-full":
+    if queue_result in ("leave", "queue-full"):
+        forced_out = queue_time >= settings.TWILIO_QUEUE_MAX_WAIT_TIME or queue_result == "queue-full"
+        response.play("not-available-voicemail" if forced_out else "left-queue-voicemail")
         response.redirect(url_for("voicemail"))
         return response  # Avoid hangup as below
     elif queue_result == "hangup":
@@ -148,6 +150,7 @@ def left_queue(request, queue_result: Form[str]):
         manager.validate_from_server()
 
     elif queue_result == "bridged":
+        response.play("goodbye")
         response.play("fun-music")
     else:
         logger.warning(f"Got unexpected left queue result: {queue_result}")
