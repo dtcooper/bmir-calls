@@ -24,7 +24,7 @@ class CallStatus(enum.StrEnum):
 
 CONFIG_DB_KEY = "__bmir_status__"
 NEXT_VALIDATION_DB_KEY = "__bmir_next_validation__"
-VALIDATE_CALL_TIMEOUT = datetime.timedelta(seconds=45)
+VALIDATE_CALL_TIMEOUT = datetime.timedelta(seconds=30)
 
 
 def load_db_value(key, *, default=None):
@@ -44,7 +44,6 @@ def delete_db_value(key):
 
 
 class CallManager:
-
     def __init__(self, *, initialize=False):
         self._initialized: bool = False
         self._called_validate_from_server_once: bool = False
