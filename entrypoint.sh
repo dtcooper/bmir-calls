@@ -39,6 +39,7 @@ if [ "$#" = 0 ]; then
         exec ./manage.py runserver
     else
         ./manage.py collectstatic --noinput &
+        ./manage.py create_twilio_queue &
 
         if [ -z "$NUM_GUNICORN_WORKERS" ]; then
             # num_cpus * 2 + 1 workers
